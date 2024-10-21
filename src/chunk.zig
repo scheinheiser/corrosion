@@ -26,6 +26,7 @@ pub const Chunk = struct {
         self.code.freeArray();
         self.lines.freeArray();
         self.constants.freeArray();
+
         self.* = initChunk();
     }
 
@@ -53,8 +54,8 @@ pub const Chunk = struct {
         self.constants.items[self.constants.count] = value;
         self.constants.count += 1;
 
-        const temp: u8 = @intCast(self.constants.count - 1);
+        const constant_idx: u8 = @intCast(self.constants.count - 1);
 
-        return temp;
+        return constant_idx;
     }
 };

@@ -10,7 +10,7 @@ pub fn dissassembleChunk(chunk: Chunk.Chunk, name: []const u8) void {
     }
 }
 
-fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
+pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
     std.debug.print("{b} ", .{offset});
     if (offset > 0 and chunk.lines.items[offset] == chunk.lines.items[offset - 1]) {
         std.debug.print("      |  ", .{});
