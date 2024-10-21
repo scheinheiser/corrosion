@@ -4,7 +4,7 @@ pub fn DynArray(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        arr: []T,
+        items: []T,
         count: usize,
         capacity: usize,
         allocator: std.mem.Allocator,
@@ -13,7 +13,7 @@ pub fn DynArray(comptime T: type) type {
             return Self{
                 .capacity = 0,
                 .count = 0,
-                .arr = &[_]T{},
+                .items = &[_]T{},
                 .allocator = std.heap.page_allocator,
             };
         }
@@ -36,16 +36,16 @@ pub fn DynArray(comptime T: type) type {
 
         pub fn reallocate(self: *Self, new_size: usize) void {
             if (new_size == 0) {
-                self.allocator.free(self.arr);
+                self.allocator.free(self.items);
                 return;
             }
 
-            const result = self.allocator.realloc(self.arr, new_size) catch |err| {
+            const result = self.allocator.realloc(self.items, new_size) catch |err| {
                 std.debug.print("Something something error -> {any}\n", .{err});
                 std.posix.exit(1);
             };
 
-            self.arr = result;
+            self.items = result;
         }
     };
 }
