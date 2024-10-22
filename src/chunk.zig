@@ -3,6 +3,14 @@ const mem = @import("memory.zig");
 
 pub const OpCode = enum {
     op_const,
+
+    op_negate,
+    op_abs,
+    op_add,
+    op_subtract,
+    op_multiply,
+    op_divide,
+
     op_return,
     blank,
 };
