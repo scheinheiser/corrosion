@@ -1,6 +1,7 @@
 const std = @import("std");
 const Chunk = @import("chunk.zig");
 const Debug = @import("debug.zig");
+const Compiler = @import("compiler.zig");
 
 const debug_trace_execution = false;
 const stack_max: usize = 256;
@@ -39,10 +40,19 @@ pub const VirtualMachine = struct {
 
     pub fn deinitVM() void {}
 
-    pub fn interpret(self: *Self, source: []const u8) InterpretResult {
-        self.compile(source);
+    pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
+        const chunk = Chunk.Chunk.initChunk();
+        defer chunk.freeChunk();
 
-        return InterpretResult.OK;
+        if (!Compiler.ompile(source, &chunk)) {
+            chunk.freeChunk();
+            return InterpretResult.COMPILE_ERROR;
+        }
+
+        self.chunk = &chunk;
+        self.ip = 0;
+
+        return self.run();
     }
 
     fn run(self: *Self) InterpretResult {
