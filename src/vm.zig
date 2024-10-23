@@ -18,6 +18,7 @@ pub const VirtualMachine = struct {
     ip: usize,
     stack: [stack_max]f32,
     stack_top: usize,
+    allocator: std.mem.allocator,
 
     pub fn initVM() VirtualMachine {
         var temp = VirtualMachine{
@@ -25,6 +26,7 @@ pub const VirtualMachine = struct {
             .ip = undefined,
             .stack = undefined,
             .stack_top = undefined,
+            .allocator = std.heap.page_allocator,
         };
 
         temp.resetStack();
@@ -37,25 +39,24 @@ pub const VirtualMachine = struct {
 
     pub fn deinitVM() void {}
 
-    pub fn interpret(self: *Self, chunk: *Chunk.Chunk) InterpretResult {
-        self.chunk = chunk;
-        self.ip = 0;
+    pub fn interpret(self: *Self, source: []const u8) InterpretResult {
+        self.compile(source);
 
-        return self.run();
+        return InterpretResult.OK;
     }
 
     fn run(self: *Self) InterpretResult {
-        if (comptime debug_trace_execution) {
-            std.debug.print("      ", .{});
-            inline for (self.stack) |stack_value| {
-                std.debug.print("[  {d:.3}  ]", .{stack_value});
-            }
-            std.debug.print("\n", .{});
-
-            _ = Debug.dissassembleInstruction(self.chunk.*, self.ip);
-        }
-
         while (true) {
+            if (comptime debug_trace_execution) {
+                std.debug.print("      ", .{});
+                for (self.stack) |stack_value| {
+                    std.debug.print("[  {d:.3}  ]", .{stack_value});
+                }
+                std.debug.print("\n", .{});
+
+                _ = Debug.dissassembleInstruction(self.chunk.*, self.ip);
+            }
+
             const value: Chunk.OpCode = @enumFromInt(self.getNextByte());
             switch (value) {
                 .op_return => {

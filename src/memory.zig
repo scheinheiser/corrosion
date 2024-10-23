@@ -42,7 +42,7 @@ pub fn DynArray(comptime T: type) type {
 
             const result = self.allocator.realloc(self.items, new_size) catch |err| {
                 std.debug.print("Something something error -> {any}\n", .{err});
-                std.posix.exit(1);
+                std.process.exit(1);
             };
 
             self.items = result;
