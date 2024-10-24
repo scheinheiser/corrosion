@@ -63,7 +63,6 @@ pub const Chunk = struct {
         self.constants.count += 1;
 
         const constant_idx: u8 = @intCast(self.constants.count - 1);
-
         return constant_idx;
     }
 };

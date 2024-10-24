@@ -1,13 +1,16 @@
 const std = @import("std");
 const sc = @import("scanner.zig");
 const chk = @import("chunk.zig");
+const Log = @import("../logger.zig");
 
 const Scanner = sc.Scanner;
 const Chunk = chk.Chunk;
+const Logger = Log.Logger;
+const LogLevel = Log.LogLevel;
 
 var compiling_chunk = undefined;
 
-inline fn currentChunk() Chunk {
+fn currentChunk() Chunk {
     return compiling_chunk.*;
 }
 
@@ -20,9 +23,9 @@ pub fn compile(source: [:0]const u8, chunk: *Chunk) bool {
     const parser = Parser.init();
     compiling_chunk = chunk;
 
-    parser.advance(scanner);
+    parser.advance(&scanner);
     expression();
-    parser.consume(sc.Tag.EOF, "Expect end of expression.");
+    parser.consume(&scanner, sc.Tag.EOF, "Expect end of expression.");
 
     endCompiler(&parser);
     return !parser.had_error;
@@ -45,20 +48,20 @@ pub const Parser = struct {
         };
     }
 
-    pub fn advance(self: *Self, scanner: Scanner) void {
+    pub fn advance(self: *Self, scanner: *Scanner) void {
         self.prev = self.current;
 
         while (true) {
-            self.current = scanner.scanToken();
+            self.current = scanner.*.scanToken();
             if (self.current.type != sc.Tag.error_token) break;
 
             self.errorCallAtCurrent();
         }
     }
 
-    pub fn consume(self: *Self, t_type: sc.Tag, message: []const u8) void {
+    pub fn consume(self: *Self, scanner: *Scanner, t_type: sc.Tag, message: []const u8) void {
         if (self.current.type == t_type) {
-            self.advance;
+            self.advance(scanner);
             return;
         }
 
@@ -76,7 +79,7 @@ pub const Parser = struct {
     }
 
     fn emitReturn(self: *Self) void {
-        self.emitByte(chk.OpCode.op_return);
+        self.emitByte(@enumFromInt(chk.OpCode.op_return));
     }
 
     fn errorCallAtCurrent(self: *Self, message: []const u8) void {
@@ -89,17 +92,15 @@ pub const Parser = struct {
 
     fn errorAt(self: *Self, token: *sc.Token, message: []const u8) void {
         if (self.panic_mode) return;
-        std.log.info("[line {any}] Error", .{token.line});
 
         if (token.type == sc.Tag.EOF) {
-            std.log.info(" at EOF", .{});
+            Logger.log(LogLevel.Err, .Compiler, "[line {any}] Error at EOF: {s}\n", .{ token.line, message });
         } else if (token.type == sc.Tag.error_token) {
-            // empty branch baybee
+            Logger.log(LogLevel.Err, .Compiler, "[line {any}] Error: {s}\n", .{ token.line, message });
         } else {
-            std.log.info(" at {s}", .{token.lexeme});
+            Logger.log(LogLevel.Err, .Compiler, "[line {any}] Error at {s}: {s}\n", .{ token.line, token.lexeme, message });
         }
 
-        std.log.info(": {s}\n", .{message});
         self.panic_mode = true;
         self.had_error = true;
     }

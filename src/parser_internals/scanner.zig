@@ -40,7 +40,7 @@ pub const Tag = enum {
     keyword_false,
     keyword_true,
 
-    // Types
+    // Literals
     string,
     integer,
     float,
@@ -49,7 +49,7 @@ pub const Tag = enum {
     identifier,
     comment,
 
-    // Can't think of a label
+    // Other
     error_token,
     EOF,
     whitespace,

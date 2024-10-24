@@ -1,4 +1,7 @@
 const std = @import("std");
+const log = @import("../logger.zig");
+
+const Log = log.Logger;
 
 pub fn DynArray(comptime T: type) type {
     return struct {
@@ -41,7 +44,7 @@ pub fn DynArray(comptime T: type) type {
             }
 
             const result = self.allocator.realloc(self.items, new_size) catch |err| {
-                std.debug.print("Something something error -> {any}\n", .{err});
+                Log.log(log.LogLevel.Err, .Memory, "Something something error -> {}", .{err});
                 std.process.exit(1);
             };
 

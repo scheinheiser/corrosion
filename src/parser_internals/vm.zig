@@ -1,7 +1,11 @@
 const std = @import("std");
 const Chunk = @import("chunk.zig");
-const Debug = @import("debug.zig");
+const Debug = @import("../debug.zig");
 const Compiler = @import("compiler.zig");
+const Log = @import("../logger.zig");
+
+const Logger = Log.Logger;
+const LogLevel = Log.LogLevel;
 
 const debug_trace_execution = false;
 const stack_max: usize = 256;
@@ -19,7 +23,6 @@ pub const VirtualMachine = struct {
     ip: usize,
     stack: [stack_max]f32,
     stack_top: usize,
-    allocator: std.mem.allocator,
 
     pub fn initVM() VirtualMachine {
         var temp = VirtualMachine{
@@ -27,7 +30,6 @@ pub const VirtualMachine = struct {
             .ip = undefined,
             .stack = undefined,
             .stack_top = undefined,
-            .allocator = std.heap.page_allocator,
         };
 
         temp.resetStack();
@@ -58,7 +60,6 @@ pub const VirtualMachine = struct {
     fn run(self: *Self) InterpretResult {
         while (true) {
             if (comptime debug_trace_execution) {
-                std.debug.print("      ", .{});
                 for (self.stack) |stack_value| {
                     std.debug.print("[  {d:.3}  ]", .{stack_value});
                 }
@@ -71,14 +72,14 @@ pub const VirtualMachine = struct {
             switch (value) {
                 .op_return => {
                     const discarded_value = self.pop();
-                    std.debug.print("Pushed value = {d:.3}\n", .{discarded_value});
+                    Logger.log(LogLevel.Debug, .VM, "Pushed value = {d:.3}\n", .{discarded_value});
 
                     return InterpretResult.OK;
                 },
                 .op_const => {
                     const constant = self.chunk.constants.items[self.getNextByte()];
                     self.push(constant);
-                    std.debug.print("{d:.3}\n", .{constant});
+                    Logger.log(LogLevel.Debug, .VM, "{d:.3}\n", .{constant});
                 },
                 .op_negate => self.push(self.pop() * -1),
                 .op_abs => self.push(if (self.pop() > 0) self.pop() else self.pop() * -1),

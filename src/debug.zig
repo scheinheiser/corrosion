@@ -1,5 +1,9 @@
 const std = @import("std");
-const Chunk = @import("chunk.zig");
+const Chunk = @import("parser_internals/chunk.zig");
+const Log = @import("logger.zig");
+
+const Logger = Log.Logger;
+const LogLevel = Log.LogLevel;
 
 pub fn dissassembleChunk(chunk: Chunk.Chunk, name: []const u8) void {
     std.debug.print("==== {s} ====\n", .{name});
@@ -29,7 +33,7 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_multiply => return simpleInstruction("OP_MULTIPLY", offset),
         .op_divide => return simpleInstruction("OP_DIVIDE", offset),
         else => {
-            std.debug.print("Unrecognised opcode -> {any}", .{instruction});
+            Logger.log(LogLevel.Warn, .Debug, "Unrecognised opcode -> {any}\n", .{instruction});
             return offset + 1;
         },
     }
