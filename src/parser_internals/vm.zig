@@ -42,11 +42,11 @@ pub const VirtualMachine = struct {
 
     pub fn deinitVM() void {}
 
-    pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
-        const chunk = Chunk.Chunk.initChunk();
+    pub fn interpret(self: *Self, source: []const u8) InterpretResult {
+        var chunk = Chunk.Chunk.initChunk();
         defer chunk.freeChunk();
 
-        if (!Compiler.ompile(source, &chunk)) {
+        if (!Compiler.compile(source, &chunk)) {
             chunk.freeChunk();
             return InterpretResult.COMPILE_ERROR;
         }

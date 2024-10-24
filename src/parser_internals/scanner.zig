@@ -68,12 +68,12 @@ pub const Token = struct {
 pub const Scanner = struct {
     const Self = @This();
 
-    source: [:0]const u8,
+    source: []const u8,
     start: usize,
     current: usize,
-    line: usize,
+    line: i32,
 
-    pub fn init(source: [:0]const u8) Scanner {
+    pub fn init(source: []const u8) Scanner {
         return Scanner{
             .start = 0,
             .current = 0,
@@ -120,9 +120,8 @@ pub const Scanner = struct {
             '>' => return self.makeToken(if (self.match('=') == true) Tag.greater_than_eql_to else Tag.greater_than),
             '<' => return self.makeToken(if (self.match('=') == true) Tag.less_than_eql_to else Tag.less_than),
             '"' => return self.string(),
+            else => return self.errorToken("Unexpected character."),
         }
-
-        return self.errorToken("Unexpected character.");
     }
 
     fn advance(self: *Self) u8 {
@@ -161,6 +160,7 @@ pub const Scanner = struct {
             'd' => switch (self.source[self.start + 3]) {
                 'v' => return self.checkKeyword("defvar", Tag.keyword_defvar),
                 'c' => return self.checkKeyword("defconstant", Tag.keyword_defconstant),
+                else => return Tag.identifier,
             },
             's' => {
                 if (!isAlpha(self.source[self.start + 3])) {
@@ -169,6 +169,7 @@ pub const Scanner = struct {
                     switch (self.source[self.start + 3]) {
                         'q' => return self.checkKeyword("setq", Tag.keyword_setq),
                         'f' => return self.checkKeyword("setf", Tag.keyword_setf),
+                        else => return Tag.identifier,
                     }
                 }
             },
@@ -183,6 +184,7 @@ pub const Scanner = struct {
             'f' => switch (self.source[self.start + 1]) {
                 'n' => return self.checkKeyword("fn", Tag.keyword_fn),
                 'a' => return self.checkKeyword("false", Tag.keyword_false),
+                else => return Tag.identifier,
             },
             'a' => return self.checkKeyword("and", Tag.keyword_and),
             'o' => return self.checkKeyword("or", Tag.keyword_or),
@@ -226,7 +228,7 @@ pub const Scanner = struct {
     // TODO: stop multiline strings from being the default string syntax.
     fn string(self: *Self) Token {
         while (self.peek() != '"' and !self.isAtEnd()) {
-            if (self.peek() == '\n') self.line != 1;
+            if (self.peek() == '\n') self.line += 1;
             _ = self.advance();
         }
 
@@ -245,7 +247,7 @@ pub const Scanner = struct {
     }
 
     fn isAtEnd(self: *Self) bool {
-        return self.source[self.current] == '0';
+        return self.current >= self.source.len;
     }
 
     fn makeToken(self: *Self, token_tag: Tag) Token {

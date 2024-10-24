@@ -9,36 +9,34 @@ const VM = virtual_machine.VirtualMachine;
 const Logger = Log.Logger;
 const LogLevel = Log.LogLevel;
 
-pub const std_options = struct {
-    pub const log_level = .debug;
-
-    pub const log_scope_levels = &[_]std.log.ScopeLevel{
-        .{ .scope = .VM, .level = log_level },
-        .{ .scope = .Compiler, .level = log_level },
-        .{ .scope = .Chunk, .level = log_level },
-        .{ .scope = .Memory, .level = log_level },
-        .{ .scope = .Scanner, .level = log_level },
-        .{ .scope = .Debug, .level = log_level },
-        .{ .scope = .REPL, .level = log_level },
-    };
+pub const std_options: std.Options = std.Options{
+    .log_level = .debug,
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .VM, .level = .debug },
+        .{ .scope = .Compiler, .level = .debug },
+        .{ .scope = .Chunk, .level = .debug },
+        .{ .scope = .Memory, .level = .debug },
+        .{ .scope = .Scanner, .level = .debug },
+        .{ .scope = .Debug, .level = .debug },
+        .{ .scope = .REPL, .level = .debug },
+    },
 };
 
-pub fn main() void {
+pub fn main() !void {
     const allocator = std.heap.page_allocator;
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
     var virtual = VM.initVM();
-    virtual.deinitVM();
 
-    switch (args.len) {
+    try switch (args.len) {
         1 => repl(&virtual),
-        2 => runFile(args[1], &virtual, allocator),
+        2 => try runFile(args[1], &virtual, allocator),
         else => {
             Logger.log(LogLevel.Err, .REPL, "Usage: buzz [path]\n", .{});
             std.process.exit(64);
         },
-    }
+    };
 }
 
 fn repl(vm: *VM) !void {
@@ -46,7 +44,7 @@ fn repl(vm: *VM) !void {
 
     var buf = std.io.bufferedReader(std_in.reader());
     var reader = buf.reader();
-    const line_buf: [1024:0]u8 = undefined;
+    var line_buf: [1024]u8 = undefined;
 
     while (true) {
         std.debug.print("> ", .{});
@@ -55,11 +53,11 @@ fn repl(vm: *VM) !void {
             break;
         };
 
-        vm.interpret(line);
+        _ = vm.interpret(line);
     }
 }
 
-fn runFile(path: []const u8, vm: *VM, allocator: std.mem.allocator) void {
+fn runFile(path: []const u8, vm: *VM, allocator: std.mem.Allocator) !void {
     const file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
 
@@ -67,6 +65,7 @@ fn runFile(path: []const u8, vm: *VM, allocator: std.mem.allocator) void {
     const res = vm.interpret(source);
 
     switch (res) {
+        .OK => {},
         .COMPILE_ERROR => std.process.exit(65),
         .RUNTIME_ERROR => std.process.exit(70),
     }

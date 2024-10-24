@@ -44,7 +44,7 @@ pub fn DynArray(comptime T: type) type {
             }
 
             const result = self.allocator.realloc(self.items, new_size) catch |err| {
-                Log.log(log.LogLevel.Err, .Memory, "Something something error -> {}", .{err});
+                Log.log(log.LogLevel.Err, .Memory, "Something something error -> {any}", .{err});
                 std.process.exit(1);
             };
 

@@ -13,16 +13,17 @@ pub const Logger = struct {
     pub fn log(
         comptime level: LogLevel,
         comptime scope: anytype,
-        comptime format: []const u8,
+        comptime text: []const u8,
         args: anytype,
     ) void {
-        const formatted_message = std.fmt.format(format, args) catch {};
+        const formatted_message: []u8 = undefined;
+        _ = std.fmt.bufPrint(formatted_message, text, args) catch {};
 
         switch (level) {
-            .Debug => std.log.scoped(scope).debug("{}", .{formatted_message}),
-            .Info => std.log.scoped(scope).info("{}", .{formatted_message}),
-            .Warn => std.log.scoped(scope).warn("{}", .{formatted_message}),
-            .Err => std.log.scoped(scope).err("{}", .{formatted_message}),
+            .Debug => std.log.scoped(scope).debug("{s}", .{formatted_message}),
+            .Info => std.log.scoped(scope).info("{s}", .{formatted_message}),
+            .Warn => std.log.scoped(scope).warn("{s}", .{formatted_message}),
+            .Err => std.log.scoped(scope).err("{s}", .{formatted_message}),
         }
     }
 };
