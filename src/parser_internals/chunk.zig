@@ -40,23 +40,25 @@ pub const Chunk = struct {
 
     pub fn writeToChunk(self: *Self, data: u8, line: i32) void {
         if (self.code.capacity < self.code.count + 1) {
-            const new_capacity = self.code.growCapacity();
+            self.code.capacity = self.code.growCapacity();
+            self.lines.capacity = self.lines.growCapacity();
 
-            self.code.growArray(new_capacity);
-            self.lines.growArray(new_capacity);
+            self.code.growArray(self.code.capacity);
+            self.lines.growArray(self.lines.capacity);
         }
 
         self.code.items[self.code.count] = data;
-        self.lines.items[self.code.count] = line;
+        self.lines.items[self.lines.count] = line;
 
         self.code.count += 1;
+        self.lines.count += 1;
     }
 
     pub fn addConstant(self: *Self, value: f32) u8 {
         if (self.constants.capacity < self.constants.count + 1) {
-            const new_capacity = self.constants.growCapacity();
+            self.constants.capacity = self.constants.growCapacity();
 
-            self.constants.growArray(new_capacity);
+            self.constants.growArray(self.constants.capacity);
         }
 
         self.constants.items[self.constants.count] = value;

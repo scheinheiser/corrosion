@@ -33,7 +33,7 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_multiply => return simpleInstruction("OP_MULTIPLY", offset),
         .op_divide => return simpleInstruction("OP_DIVIDE", offset),
         else => {
-            Logger.log(LogLevel.Warn, .Debug, "Unrecognised opcode -> {any}\n", .{instruction});
+            Logger.log(std.log.Level.warn, .Debug, "Unrecognised opcode -> {any}\n", .{instruction});
             return offset + 1;
         },
     }

@@ -7,7 +7,6 @@ const Debug = @import("../debug.zig");
 const Scanner = sc.Scanner;
 const Chunk = chk.Chunk;
 const Logger = Log.Logger;
-const LogLevel = Log.LogLevel;
 
 const debug_print_code = true;
 
@@ -15,14 +14,14 @@ fn endCompiler(parser: *Parser) void {
     parser.*.emitReturn();
     if (comptime debug_print_code) {
         if (!parser.had_error) {
-            Debug.dissassembleChunk(parser.currentChunk(), "code");
+            Debug.dissassembleChunk(parser.currentChunk().*, "code");
         }
     }
 }
 
 pub fn compile(source: []const u8, chunk: *Chunk) bool {
     const scanner = Scanner.init(source);
-    var parser = Parser.init(scanner, chunk.*);
+    var parser = Parser.init(scanner, chunk);
 
     parser.advance();
     parser.expression();
@@ -82,11 +81,11 @@ pub const Parser = struct {
     current: sc.Token,
     prev: sc.Token,
     scanner: Scanner,
-    compiling_chunk: Chunk,
+    compiling_chunk: *Chunk,
     had_error: bool,
     panic_mode: bool,
 
-    pub fn init(scanner: Scanner, chunk: Chunk) Parser {
+    pub fn init(scanner: Scanner, chunk: *Chunk) Parser {
         return Parser{
             .current = undefined,
             .prev = undefined,
@@ -97,7 +96,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn currentChunk(self: *Self) Chunk {
+    pub fn currentChunk(self: *Self) *Chunk {
         return self.compiling_chunk;
     }
 
@@ -140,7 +139,7 @@ pub const Parser = struct {
         self.parsePrecedence(Precedence.UNARY);
 
         switch (operatorT) {
-            .subtract => self.emitByte(@intFromEnum(sc.Tag.subtract)),
+            .subtract => self.emitByte(@intFromEnum(chk.OpCode.op_negate)),
             else => unreachable,
         }
     }
@@ -153,10 +152,10 @@ pub const Parser = struct {
         self.parsePrecedence(precedence);
 
         switch (operatorT) {
-            .plus => self.emitByte(@intFromEnum(sc.Tag.plus)),
-            .subtract => self.emitByte(@intFromEnum(sc.Tag.subtract)),
-            .multiply => self.emitByte(@intFromEnum(sc.Tag.multiply)),
-            .divide => self.emitByte(@intFromEnum(sc.Tag.divide)),
+            .plus => self.emitByte(@intFromEnum(chk.OpCode.op_add)),
+            .subtract => self.emitByte(@intFromEnum(chk.OpCode.op_subtract)),
+            .multiply => self.emitByte(@intFromEnum(chk.OpCode.op_multiply)),
+            .divide => self.emitByte(@intFromEnum(chk.OpCode.op_divide)),
             else => unreachable,
         }
     }
@@ -179,8 +178,7 @@ pub const Parser = struct {
     }
 
     fn emitByte(self: *Self, byte: u8) void {
-        var current_chunk = self.currentChunk();
-        current_chunk.writeToChunk(byte, self.prev.line);
+        self.currentChunk().writeToChunk(byte, self.prev.line);
     }
 
     fn emitBytes(self: *Self, byte1: u8, byte2: u8) void {
@@ -220,11 +218,11 @@ pub const Parser = struct {
         if (self.panic_mode) return;
 
         if (token.type == sc.Tag.EOF) {
-            Logger.log(LogLevel.Err, .Compiler, "[line {any}] Error at EOF: {s}\n", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at EOF: {s}", .{ token.line, message });
         } else if (token.type == sc.Tag.error_token) {
-            Logger.log(LogLevel.Err, .Compiler, "[line {any}] Error: {s}\n", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error: {s}", .{ token.line, message });
         } else {
-            Logger.log(LogLevel.Err, .Compiler, "[line {any}] Error at {s}: {s}\n", .{ token.line, token.lexeme, message });
+            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at {s}: {s}", .{ token.line, token.lexeme, message });
         }
 
         self.panic_mode = true;

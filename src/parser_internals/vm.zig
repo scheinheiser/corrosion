@@ -5,7 +5,6 @@ const Compiler = @import("compiler.zig");
 const Log = @import("../logger.zig");
 
 const Logger = Log.Logger;
-const LogLevel = Log.LogLevel;
 
 const debug_trace_execution = false;
 const stack_max: usize = 256;
@@ -46,7 +45,8 @@ pub const VirtualMachine = struct {
         var chunk = Chunk.Chunk.initChunk();
         defer chunk.freeChunk();
 
-        if (!Compiler.compile(source, &chunk)) {
+        const comp_res = Compiler.compile(source, &chunk);
+        if (!comp_res) {
             chunk.freeChunk();
             return InterpretResult.COMPILE_ERROR;
         }
@@ -72,14 +72,14 @@ pub const VirtualMachine = struct {
             switch (value) {
                 .op_return => {
                     const discarded_value = self.pop();
-                    Logger.log(LogLevel.Debug, .VM, "Pushed value = {d:.3}\n", .{discarded_value});
+                    Logger.log(std.log.Level.debug, .VM, "Pushed value = {d:.3}", .{discarded_value});
 
                     return InterpretResult.OK;
                 },
                 .op_const => {
                     const constant = self.chunk.constants.items[self.getNextByte()];
                     self.push(constant);
-                    Logger.log(LogLevel.Debug, .VM, "{d:.3}\n", .{constant});
+                    Logger.log(std.log.Level.debug, .VM, "{d:.3}", .{constant});
                 },
                 .op_negate => self.push(self.pop() * -1),
                 .op_abs => self.push(if (self.pop() > 0) self.pop() else self.pop() * -1),

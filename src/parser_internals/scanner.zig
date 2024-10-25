@@ -1,4 +1,7 @@
 const std = @import("std");
+const Log = @import("../logger.zig");
+
+const Logger = Log.Logger;
 
 pub const Tag = enum {
     // Single character tokens
@@ -91,12 +94,11 @@ pub const Scanner = struct {
     }
 
     pub fn scanToken(self: *Self) Token {
+        self.skipWhitespace();
         self.start = self.current;
-
         if (self.isAtEnd()) return self.makeToken(Tag.EOF);
 
         const character = self.advance();
-
         if (isAlpha(character)) return self.identifier();
         if (isDigit(character)) return self.number();
 
@@ -130,7 +132,7 @@ pub const Scanner = struct {
     }
 
     fn match(self: *Self, expected_char: u8) bool {
-        if (self.isAtEnd() == true) return false;
+        if (self.isAtEnd()) return false;
         if (self.source[self.current] != expected_char) return false;
 
         self.current += 1;
@@ -239,6 +241,7 @@ pub const Scanner = struct {
     }
 
     fn peek(self: *Self) u8 {
+        if (self.isAtEnd()) return 0;
         return self.source[self.current];
     }
 

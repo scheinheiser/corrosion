@@ -1,7 +1,8 @@
 const std = @import("std");
 const log = @import("../logger.zig");
 
-const Log = log.Logger;
+const Logger = log.Logger;
+const LogLevel = log.LogLevel;
 
 pub fn DynArray(comptime T: type) type {
     return struct {
@@ -23,8 +24,10 @@ pub fn DynArray(comptime T: type) type {
 
         pub fn growCapacity(self: *Self) usize {
             if (self.capacity < 8) {
+                self.capacity = 8;
                 return 8;
             } else {
+                self.capacity *= 2;
                 return self.capacity * 2;
             }
         }
@@ -37,14 +40,14 @@ pub fn DynArray(comptime T: type) type {
             return self.reallocate(0);
         }
 
-        pub fn reallocate(self: *Self, new_size: usize) void {
+        fn reallocate(self: *Self, new_size: usize) void {
             if (new_size == 0) {
                 self.allocator.free(self.items);
                 return;
             }
 
             const result = self.allocator.realloc(self.items, new_size) catch |err| {
-                Log.log(log.LogLevel.Err, .Memory, "Something something error -> {any}", .{err});
+                Logger.log(std.log.Level.err, .Memory, "Something something error -> {any}", .{err});
                 std.process.exit(1);
             };
 
