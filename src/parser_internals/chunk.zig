@@ -1,5 +1,8 @@
 const std = @import("std");
 const mem = @import("memory.zig");
+const val = @import("value.zig");
+
+const Value = val.Value;
 
 pub const OpCode = enum {
     op_const,
@@ -11,6 +14,10 @@ pub const OpCode = enum {
     op_multiply,
     op_divide,
 
+    op_nil,
+    op_true,
+    op_false,
+
     op_return,
     blank,
 };
@@ -20,13 +27,13 @@ pub const Chunk = struct {
 
     code: mem.DynArray(u8),
     lines: mem.DynArray(i32),
-    constants: mem.DynArray(f32),
+    constants: mem.DynArray(Value),
 
     pub fn initChunk() Self {
         return Self{
             .code = mem.DynArray(u8).initArr(),
             .lines = mem.DynArray(i32).initArr(),
-            .constants = mem.DynArray(f32).initArr(),
+            .constants = mem.DynArray(Value).initArr(),
         };
     }
 
@@ -54,7 +61,7 @@ pub const Chunk = struct {
         self.lines.count += 1;
     }
 
-    pub fn addConstant(self: *Self, value: f32) u8 {
+    pub fn addConstant(self: *Self, value: Value) u8 {
         if (self.constants.capacity < self.constants.count + 1) {
             self.constants.capacity = self.constants.growCapacity();
 

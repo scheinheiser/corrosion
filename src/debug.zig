@@ -1,9 +1,10 @@
 const std = @import("std");
+const val = @import("parser_internals/value.zig");
 const Chunk = @import("parser_internals/chunk.zig");
 const Log = @import("logger.zig");
 
 const Logger = Log.Logger;
-const LogLevel = Log.LogLevel;
+const Value = val.Value;
 
 pub fn dissassembleChunk(chunk: Chunk.Chunk, name: []const u8) void {
     std.debug.print("==== {s} ====\n", .{name});
@@ -32,6 +33,9 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_subtract => return simpleInstruction("OP_SUBTRACT", offset),
         .op_multiply => return simpleInstruction("OP_MULTIPLY", offset),
         .op_divide => return simpleInstruction("OP_DIVIDE", offset),
+        .op_nil => return simpleInstruction("OP_NIL", offset),
+        .op_true => return simpleInstruction("OP_TRUE", offset),
+        .op_false => return simpleInstruction("OP_FALSE", offset),
         else => {
             Logger.log(std.log.Level.warn, .Debug, "Unrecognised opcode -> {any}\n", .{instruction});
             return offset + 1;
@@ -46,7 +50,10 @@ fn simpleInstruction(name: []const u8, offset: usize) usize {
 
 fn constantInstruction(name: []const u8, chunk: Chunk.Chunk, offset: usize) usize {
     const constant = chunk.code.items[offset + 1];
-    std.debug.print("{s}       {d} '{d:.3}'\n", .{ name, constant, chunk.constants.items[constant] });
+    std.debug.print("{s}       {d} ", .{ name, constant });
+
+    var constant_value = &chunk.constants.items[constant];
+    constant_value.printValue();
 
     return offset + 2;
 }

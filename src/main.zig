@@ -9,7 +9,7 @@ const VM = virtual_machine.VirtualMachine;
 const Logger = Log.Logger;
 
 pub const std_options: std.Options = std.Options{
-    .log_level = .debug,
+    .log_level = .info,
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .VM, .level = .debug },
         .{ .scope = .Compiler, .level = .debug },
@@ -17,6 +17,7 @@ pub const std_options: std.Options = std.Options{
         .{ .scope = .Memory, .level = .debug },
         .{ .scope = .Scanner, .level = .debug },
         .{ .scope = .Debug, .level = .debug },
+        .{ .scope = .Result, .level = .debug },
         .{ .scope = .REPL, .level = .debug },
     },
 };

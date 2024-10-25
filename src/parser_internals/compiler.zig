@@ -3,9 +3,11 @@ const sc = @import("scanner.zig");
 const chk = @import("chunk.zig");
 const Log = @import("../logger.zig");
 const Debug = @import("../debug.zig");
+const val = @import("value.zig");
 
 const Scanner = sc.Scanner;
 const Chunk = chk.Chunk;
+const Value = val.Value;
 const Logger = Log.Logger;
 
 const debug_print_code = true;
@@ -71,6 +73,7 @@ fn getRule(token_type: sc.Tag) ParseRule {
         .divide => ParseRule.init(null, Parser.binary, Precedence.FACTOR),
         .multiply => ParseRule.init(null, Parser.binary, Precedence.FACTOR),
         .integer, .float => ParseRule.init(Parser.number, null, Precedence.NONE),
+        .keyword_false, .keyword_true, .keyword_nil => ParseRule.init(Parser.literal, null, Precedence.NONE),
         else => ParseRule.init(null, null, Precedence.NONE),
     };
 }
@@ -131,7 +134,7 @@ pub const Parser = struct {
 
     fn number(self: *Self) void {
         const value = std.fmt.parseFloat(f32, self.prev.lexeme) catch unreachable;
-        self.emitConstant(value);
+        self.emitConstant(Value.makeNumber(value));
     }
 
     fn unary(self: *Self) void {
@@ -156,6 +159,15 @@ pub const Parser = struct {
             .subtract => self.emitByte(@intFromEnum(chk.OpCode.op_subtract)),
             .multiply => self.emitByte(@intFromEnum(chk.OpCode.op_multiply)),
             .divide => self.emitByte(@intFromEnum(chk.OpCode.op_divide)),
+            else => unreachable,
+        }
+    }
+
+    fn literal(self: *Self) void {
+        switch (self.prev.type) {
+            .keyword_nil => self.emitByte(@intFromEnum(chk.OpCode.op_nil)),
+            .keyword_true => self.emitByte(@intFromEnum(chk.OpCode.op_true)),
+            .keyword_false => self.emitByte(@intFromEnum(chk.OpCode.op_false)),
             else => unreachable,
         }
     }
@@ -190,11 +202,11 @@ pub const Parser = struct {
         self.emitByte(@intFromEnum(chk.OpCode.op_return));
     }
 
-    fn emitConstant(self: *Self, value: f32) void {
+    fn emitConstant(self: *Self, value: Value) void {
         self.emitBytes(@intFromEnum(chk.OpCode.op_const), self.makeConstant(value));
     }
 
-    fn makeConstant(self: *Self, constant: f32) u8 {
+    fn makeConstant(self: *Self, constant: Value) u8 {
         var chunk = self.currentChunk();
         const constant_idx = chunk.addConstant(constant);
 
@@ -222,7 +234,7 @@ pub const Parser = struct {
         } else if (token.type == sc.Tag.error_token) {
             Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error: {s}", .{ token.line, message });
         } else {
-            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at {s}: {s}", .{ token.line, token.lexeme, message });
+            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at '{s}': {s}", .{ token.line, token.lexeme, message });
         }
 
         self.panic_mode = true;
