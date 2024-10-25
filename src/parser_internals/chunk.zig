@@ -14,6 +14,11 @@ pub const OpCode = enum {
     op_multiply,
     op_divide,
 
+    op_not,
+    op_greater,
+    op_equal,
+    op_less,
+
     op_nil,
     op_true,
     op_false,

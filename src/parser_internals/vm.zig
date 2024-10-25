@@ -103,7 +103,7 @@ pub const VirtualMachine = struct {
                     var popped_value = self.pop();
                     self.push(Value.makeNumber(if (popped_value.asNumber() > 0) popped_value.asNumber() else popped_value.asNumber() * -1));
                 },
-                .op_add, .op_subtract, .op_multiply, .op_divide => |op| {
+                .op_add, .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less => |op| {
                     const res = self.binaryOperator(op);
                     if (res == .nil) return InterpretResult.RUNTIME_ERROR;
 
@@ -112,6 +112,16 @@ pub const VirtualMachine = struct {
                 .op_nil => self.push(Value.makeNil()),
                 .op_true => self.push(Value.makeBool(true)),
                 .op_false => self.push(Value.makeBool(false)),
+                .op_not => {
+                    var popped_value = self.pop();
+                    self.push(Value.makeBool(popped_value.isFalsey()));
+                },
+                .op_equal => {
+                    var value2 = self.pop();
+                    var value1 = self.pop();
+
+                    self.push(Value.makeBool(Value.checkEquality(&value1, &value2)));
+                },
                 else => {},
             }
         }
@@ -157,6 +167,8 @@ pub const VirtualMachine = struct {
             .op_subtract => return Value.makeNumber(value1 - value2),
             .op_multiply => return Value.makeNumber(value1 * value2),
             .op_divide => return Value.makeNumber(value1 / value2),
+            .op_less => return Value.makeBool(value1 < value2),
+            .op_greater => return Value.makeBool(value1 > value2),
             else => unreachable,
         }
     }

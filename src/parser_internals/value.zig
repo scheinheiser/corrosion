@@ -44,6 +44,27 @@ pub const Value = union(enum) {
         return self.number;
     }
 
+    pub fn isFalsey(self: *Self) bool {
+        return self.isNil() or (self.isBool() and !self.asBool());
+    }
+
+    pub fn checkEquality(a: *Value, b: *Value) bool {
+        return switch (a.*) {
+            .nil => switch (b.*) {
+                .nil => true,
+                else => false,
+            },
+            .boolean => switch (b.*) {
+                .boolean => a.asBool() == b.asBool(),
+                else => false,
+            },
+            .number => switch (b.*) {
+                .number => a.asNumber() == b.asNumber(),
+                else => false,
+            },
+        };
+    }
+
     pub fn printValue(self: *Self) void {
         switch (self.*) {
             .number => std.debug.print("'{d:.3}'\n", .{self.*.number}),

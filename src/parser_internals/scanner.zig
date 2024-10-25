@@ -1,7 +1,9 @@
 const std = @import("std");
+const val = @import("value.zig");
 const Log = @import("../logger.zig");
 
 const Logger = Log.Logger;
+const Value = val.Value;
 
 pub const Tag = enum {
     // Single character tokens

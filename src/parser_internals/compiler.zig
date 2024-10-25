@@ -74,6 +74,9 @@ fn getRule(token_type: sc.Tag) ParseRule {
         .multiply => ParseRule.init(null, Parser.binary, Precedence.FACTOR),
         .integer, .float => ParseRule.init(Parser.number, null, Precedence.NONE),
         .keyword_false, .keyword_true, .keyword_nil => ParseRule.init(Parser.literal, null, Precedence.NONE),
+        .bang => ParseRule.init(Parser.unary, null, Precedence.NONE),
+        .bang_equal, .equal_equal => ParseRule.init(null, Parser.binary, Precedence.EQUALITY),
+        .greater_than, .greater_than_eql_to, .less_than, .less_than_eql_to => ParseRule.init(null, Parser.binary, Precedence.COMPARISON),
         else => ParseRule.init(null, null, Precedence.NONE),
     };
 }
@@ -143,6 +146,7 @@ pub const Parser = struct {
 
         switch (operatorT) {
             .subtract => self.emitByte(@intFromEnum(chk.OpCode.op_negate)),
+            .bang => self.emitByte(@intFromEnum(chk.OpCode.op_not)),
             else => unreachable,
         }
     }
@@ -159,6 +163,12 @@ pub const Parser = struct {
             .subtract => self.emitByte(@intFromEnum(chk.OpCode.op_subtract)),
             .multiply => self.emitByte(@intFromEnum(chk.OpCode.op_multiply)),
             .divide => self.emitByte(@intFromEnum(chk.OpCode.op_divide)),
+            .less_than => self.emitByte(@intFromEnum(chk.OpCode.op_less)),
+            .greater_than => self.emitByte(@intFromEnum(chk.OpCode.op_greater)),
+            .less_than_eql_to => self.emitBytes(@intFromEnum(chk.OpCode.op_less), @intFromEnum(chk.OpCode.op_equal)),
+            .greater_than_eql_to => self.emitBytes(@intFromEnum(chk.OpCode.op_greater), @intFromEnum(chk.OpCode.op_equal)),
+            .equal_equal => self.emitByte(@intFromEnum(chk.OpCode.op_equal)),
+            .bang_equal => self.emitBytes(@intFromEnum(chk.OpCode.op_not), @intFromEnum(chk.OpCode.op_equal)),
             else => unreachable,
         }
     }
