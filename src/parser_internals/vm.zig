@@ -43,7 +43,7 @@ pub const VirtualMachine = struct {
 
     fn runtimeError(self: *Self, comptime text: []const u8, args: anytype) void {
         Logger.log(std.log.Level.err, .VM, text, args);
-        Logger.log(std.log.Level.info, .VM, "[line {d}] in script.", .{self.chunk.lines.items[self.ip]});
+        Logger.log(std.log.Level.err, .VM, "[line {d}] in script.", .{self.chunk.lines.items[self.ip]});
 
         self.resetStack();
     }
@@ -86,7 +86,6 @@ pub const VirtualMachine = struct {
                 .op_const => {
                     const constant = self.chunk.constants.items[self.getNextByte()];
                     self.push(constant);
-                    // Logger.log(std.log.Level.debug, .VM, "{d:.3}", .{constant.asNumber()});
                 },
                 .op_negate => {
                     var peek_res = self.peek(0);
@@ -103,7 +102,7 @@ pub const VirtualMachine = struct {
                     var popped_value = self.pop();
                     self.push(Value.makeNumber(if (popped_value.asNumber() > 0) popped_value.asNumber() else popped_value.asNumber() * -1));
                 },
-                .op_add, .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less => |op| {
+                .op_add, .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less, .op_mod => |op| {
                     const res = self.binaryOperator(op);
                     if (res == .nil) return InterpretResult.RUNTIME_ERROR;
 
@@ -167,6 +166,7 @@ pub const VirtualMachine = struct {
             .op_subtract => return Value.makeNumber(value1 - value2),
             .op_multiply => return Value.makeNumber(value1 * value2),
             .op_divide => return Value.makeNumber(value1 / value2),
+            .op_mod => return Value.makeNumber(@mod(value1, value2)),
             .op_less => return Value.makeBool(value1 < value2),
             .op_greater => return Value.makeBool(value1 > value2),
             else => unreachable,

@@ -7,11 +7,12 @@ pub const Logger = struct {
         comptime text: []const u8,
         args: anytype,
     ) void {
-        switch (level) {
-            .debug => std.log.scoped(scope).debug(text, args),
-            .info => std.log.scoped(scope).info(text, args),
-            .warn => std.log.scoped(scope).warn(text, args),
-            .err => std.log.scoped(scope).err(text, args),
-        }
+        const scope_prefix = "(" ++ comptime @tagName(scope) ++ "): ";
+        const prefix = "[" ++ comptime level.asText() ++ "] " ++ scope_prefix;
+
+        std.debug.lockStdErr();
+        defer std.debug.unlockStdErr();
+        const stderr = std.io.getStdErr().writer();
+        stderr.print(prefix ++ text ++ "\n", args) catch return;
     }
 };

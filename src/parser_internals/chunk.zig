@@ -13,6 +13,7 @@ pub const OpCode = enum {
     op_subtract,
     op_multiply,
     op_divide,
+    op_mod,
 
     op_not,
     op_greater,

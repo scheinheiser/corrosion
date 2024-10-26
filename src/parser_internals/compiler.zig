@@ -70,8 +70,7 @@ fn getRule(token_type: sc.Tag) ParseRule {
         .leftbracket => ParseRule.init(Parser.grouping, null, Precedence.NONE),
         .subtract => ParseRule.init(Parser.unary, Parser.binary, Precedence.TERM),
         .plus => ParseRule.init(null, Parser.binary, Precedence.TERM),
-        .divide => ParseRule.init(null, Parser.binary, Precedence.FACTOR),
-        .multiply => ParseRule.init(null, Parser.binary, Precedence.FACTOR),
+        .divide, .multiply, .mod => ParseRule.init(null, Parser.binary, Precedence.FACTOR),
         .integer, .float => ParseRule.init(Parser.number, null, Precedence.NONE),
         .keyword_false, .keyword_true, .keyword_nil => ParseRule.init(Parser.literal, null, Precedence.NONE),
         .bang => ParseRule.init(Parser.unary, null, Precedence.NONE),
@@ -163,6 +162,7 @@ pub const Parser = struct {
             .subtract => self.emitByte(@intFromEnum(chk.OpCode.op_subtract)),
             .multiply => self.emitByte(@intFromEnum(chk.OpCode.op_multiply)),
             .divide => self.emitByte(@intFromEnum(chk.OpCode.op_divide)),
+            .mod => self.emitByte(@intFromEnum(chk.OpCode.op_mod)),
             .less_than => self.emitByte(@intFromEnum(chk.OpCode.op_less)),
             .greater_than => self.emitByte(@intFromEnum(chk.OpCode.op_greater)),
             .less_than_eql_to => self.emitBytes(@intFromEnum(chk.OpCode.op_less), @intFromEnum(chk.OpCode.op_equal)),
@@ -240,11 +240,11 @@ pub const Parser = struct {
         if (self.panic_mode) return;
 
         if (token.type == sc.Tag.EOF) {
-            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at EOF: {s}", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at EOF - {s}", .{ token.line, message });
         } else if (token.type == sc.Tag.error_token) {
-            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error: {s}", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error - {s}", .{ token.line, message });
         } else {
-            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at '{s}': {s}", .{ token.line, token.lexeme, message });
+            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at '{s}' - {s}", .{ token.line, token.lexeme, message });
         }
 
         self.panic_mode = true;

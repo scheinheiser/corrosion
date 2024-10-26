@@ -33,6 +33,7 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_subtract => return simpleInstruction("OP_SUBTRACT", offset),
         .op_multiply => return simpleInstruction("OP_MULTIPLY", offset),
         .op_divide => return simpleInstruction("OP_DIVIDE", offset),
+        .op_mod => return simpleInstruction("OP_MOD", offset),
         .op_nil => return simpleInstruction("OP_NIL", offset),
         .op_true => return simpleInstruction("OP_TRUE", offset),
         .op_false => return simpleInstruction("OP_FALSE", offset),

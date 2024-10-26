@@ -24,10 +24,8 @@ pub fn DynArray(comptime T: type) type {
 
         pub fn growCapacity(self: *Self) usize {
             if (self.capacity < 8) {
-                self.capacity = 8;
                 return 8;
             } else {
-                self.capacity *= 2;
                 return self.capacity * 2;
             }
         }

@@ -15,6 +15,7 @@ pub const Tag = enum {
     subtract, // -
     multiply, // *
     divide, // /
+    mod, // %
     dot, // .
     comma, // ,
     bang, // !
@@ -114,6 +115,7 @@ pub const Scanner = struct {
             '*' => return self.makeToken(Tag.multiply),
             '/' => return self.makeToken(Tag.divide),
             '!' => return self.makeToken(if (self.match('=') == true) Tag.bang_equal else Tag.bang),
+            '%' => return self.makeToken(Tag.mod),
             '=' => {
                 if (self.match('=') == true) {
                     return self.makeToken(Tag.equal_equal);
