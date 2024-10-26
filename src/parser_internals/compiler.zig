@@ -4,11 +4,15 @@ const chk = @import("chunk.zig");
 const Log = @import("../logger.zig");
 const Debug = @import("../debug.zig");
 const val = @import("value.zig");
+const obj = @import("obj.zig");
+const VirtualMachine = @import("vm.zig");
 
 const Scanner = sc.Scanner;
 const Chunk = chk.Chunk;
 const Value = val.Value;
 const Logger = Log.Logger;
+const Obj = obj.Obj;
+const VM = VirtualMachine.VirtualMachine;
 
 const debug_print_code = true;
 
@@ -21,9 +25,9 @@ fn endCompiler(parser: *Parser) void {
     }
 }
 
-pub fn compile(source: []const u8, chunk: *Chunk) bool {
+pub fn compile(source: []const u8, vm: *VM, chunk: *Chunk) bool {
     const scanner = Scanner.init(source);
-    var parser = Parser.init(scanner, chunk);
+    var parser = Parser.init(scanner, chunk, vm);
 
     parser.advance();
     parser.expression();
@@ -76,6 +80,7 @@ fn getRule(token_type: sc.Tag) ParseRule {
         .bang => ParseRule.init(Parser.unary, null, Precedence.NONE),
         .bang_equal, .equal_equal => ParseRule.init(null, Parser.binary, Precedence.EQUALITY),
         .greater_than, .greater_than_eql_to, .less_than, .less_than_eql_to => ParseRule.init(null, Parser.binary, Precedence.COMPARISON),
+        .string => ParseRule.init(Parser.string, null, Precedence.NONE),
         else => ParseRule.init(null, null, Precedence.NONE),
     };
 }
@@ -89,8 +94,9 @@ pub const Parser = struct {
     compiling_chunk: *Chunk,
     had_error: bool,
     panic_mode: bool,
+    vm: *VM,
 
-    pub fn init(scanner: Scanner, chunk: *Chunk) Parser {
+    pub fn init(scanner: Scanner, chunk: *Chunk, vm: *VM) Parser {
         return Parser{
             .current = undefined,
             .prev = undefined,
@@ -98,6 +104,7 @@ pub const Parser = struct {
             .panic_mode = false,
             .scanner = scanner,
             .compiling_chunk = chunk,
+            .vm = vm,
         };
     }
 
@@ -137,6 +144,13 @@ pub const Parser = struct {
     fn number(self: *Self) void {
         const value = std.fmt.parseFloat(f32, self.prev.lexeme) catch unreachable;
         self.emitConstant(Value.makeNumber(value));
+    }
+
+    fn string(self: *Self) void {
+        const obj_string = self.prev.lexeme[1 .. self.prev.lexeme.len - 1];
+        const copied_string = obj.String.copy(self.vm, obj_string);
+
+        self.emitConstant(Value.makeString(copied_string));
     }
 
     fn unary(self: *Self) void {

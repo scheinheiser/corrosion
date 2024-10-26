@@ -4,9 +4,12 @@ const Debug = @import("../debug.zig");
 const Compiler = @import("compiler.zig");
 const Log = @import("../logger.zig");
 const Val = @import("value.zig");
+const obj = @import("obj.zig");
 
 const Logger = Log.Logger;
 const Value = Val.Value;
+const Obj = obj.Obj;
+const ObjType = obj.ObjType;
 
 const debug_trace_execution = false;
 const stack_max: usize = 256;
@@ -24,6 +27,8 @@ pub const VirtualMachine = struct {
     ip: usize,
     stack: [stack_max]Value,
     stack_top: usize,
+    objects: ?*Obj,
+    allocator: std.mem.Allocator,
 
     pub fn initVM() VirtualMachine {
         var temp = VirtualMachine{
@@ -31,10 +36,26 @@ pub const VirtualMachine = struct {
             .ip = undefined,
             .stack = undefined,
             .stack_top = undefined,
+            .objects = null,
+            .allocator = std.heap.page_allocator,
         };
 
         temp.resetStack();
         return temp;
+    }
+
+    pub fn deinitVM(self: *Self) void {
+        self.freeObjects();
+    }
+
+    fn freeObjects(self: *Self) void {
+        var object = self.objects;
+
+        while (object != null) {
+            const next = object.?.next;
+            obj.String.deinit(object.?, self);
+            object = next;
+        }
     }
 
     inline fn resetStack(self: *Self) void {
@@ -52,7 +73,7 @@ pub const VirtualMachine = struct {
         var chunk = Chunk.Chunk.initChunk();
         defer chunk.freeChunk();
 
-        const comp_res = Compiler.compile(source, &chunk);
+        const comp_res = Compiler.compile(source, self, &chunk);
         if (!comp_res) {
             chunk.freeChunk();
             return InterpretResult.COMPILE_ERROR;
@@ -88,36 +109,42 @@ pub const VirtualMachine = struct {
                     self.push(constant);
                 },
                 .op_negate => {
-                    var peek_res = self.peek(0);
-                    if (!Value.isNum(&peek_res)) {
+                    if (!Value.isNum(self.peek(0))) {
                         self.runtimeError("Operand must be a number.", .{});
                         return InterpretResult.RUNTIME_ERROR;
                     }
 
-                    var popped_value = self.pop();
-                    const negated_value = popped_value.asNumber() * -1;
+                    const negated_value = self.pop().asNumber() * -1;
                     self.push(Value.makeNumber(negated_value));
                 },
-                .op_abs => {
-                    var popped_value = self.pop();
-                    self.push(Value.makeNumber(if (popped_value.asNumber() > 0) popped_value.asNumber() else popped_value.asNumber() * -1));
-                },
-                .op_add, .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less, .op_mod => |op| {
+                .op_abs => self.push(Value.makeNumber(if (self.pop().asNumber() > 0) self.pop().asNumber() else self.pop().asNumber() * -1)),
+                .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less, .op_mod => |op| {
                     const res = self.binaryOperator(op);
-                    if (res == .nil) return InterpretResult.RUNTIME_ERROR;
+                    if (res == .nil) {
+                        self.runtimeError("The operands must be numbers.", .{});
+                        return InterpretResult.RUNTIME_ERROR;
+                    }
 
                     self.push(res);
+                },
+                .op_add => {
+                    if (self.peek(0).isString() and self.peek(1).isString()) {
+                        self.concatenate();
+                    } else if (self.peek(0).isNum() and self.peek(1).isNum()) {
+                        const res = self.binaryOperator(.op_add);
+                        self.push(res);
+                    } else {
+                        self.runtimeError("Operands must both be of strings or numbers.", .{});
+                        return InterpretResult.RUNTIME_ERROR;
+                    }
                 },
                 .op_nil => self.push(Value.makeNil()),
                 .op_true => self.push(Value.makeBool(true)),
                 .op_false => self.push(Value.makeBool(false)),
-                .op_not => {
-                    var popped_value = self.pop();
-                    self.push(Value.makeBool(popped_value.isFalsey()));
-                },
+                .op_not => self.push(Value.makeBool(self.pop().isFalsey())),
                 .op_equal => {
-                    var value2 = self.pop();
-                    var value1 = self.pop();
+                    const value2 = self.pop();
+                    const value1 = self.pop();
 
                     self.push(Value.makeBool(Value.checkEquality(&value1, &value2)));
                 },
@@ -148,18 +175,13 @@ pub const VirtualMachine = struct {
     }
 
     fn binaryOperator(self: *Self, op: Chunk.OpCode) Value {
-        var peeked_operand1 = self.peek(0);
-        var peeked_operand2 = self.peek(1);
-        if (!Value.isNum(&peeked_operand1) or !Value.isNum(&peeked_operand2)) {
+        if (!Value.isNum(self.peek(0)) or !Value.isNum(self.peek(1))) {
             self.runtimeError("Operands must be numbers.", .{});
             return Value.makeNil();
         }
 
-        var operand2 = self.pop();
-        var operand1 = self.pop();
-
-        const value1 = operand1.asNumber();
-        const value2 = operand2.asNumber();
+        const value2 = self.pop().asNumber();
+        const value1 = self.pop().asNumber();
 
         switch (op) {
             .op_add => return Value.makeNumber(value1 + value2),
@@ -171,5 +193,18 @@ pub const VirtualMachine = struct {
             .op_greater => return Value.makeBool(value1 > value2),
             else => unreachable,
         }
+    }
+
+    fn concatenate(self: *Self) void {
+        const b = self.pop().asString();
+        const a = self.pop().asString();
+
+        const result = std.mem.concat(self.allocator, u8, &[_][]const u8{ a.characters, b.characters }) catch {
+            Logger.log(std.log.Level.err, .Compiler, "Not enough memory to concatenate strings.", .{});
+            std.process.exit(1);
+        };
+
+        const str = obj.String.copy(self, result);
+        self.push(Value.makeString(str));
     }
 };

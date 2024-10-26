@@ -55,6 +55,8 @@ fn repl(vm: *VM) !void {
 
         _ = vm.interpret(line);
     }
+
+    vm.deinitVM();
 }
 
 fn runFile(path: []const u8, vm: *VM, allocator: std.mem.Allocator) !void {
@@ -64,6 +66,7 @@ fn runFile(path: []const u8, vm: *VM, allocator: std.mem.Allocator) !void {
     const source = try file.readToEndAlloc(allocator, std.math.maxInt(u32));
     const res = vm.interpret(source);
 
+    vm.deinitVM();
     switch (res) {
         .OK => {},
         .COMPILE_ERROR => std.process.exit(65),
