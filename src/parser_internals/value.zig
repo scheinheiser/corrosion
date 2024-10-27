@@ -90,18 +90,6 @@ pub const Value = union(enum) {
         };
     }
 
-    fn printObject(self: Self) void {
-        switch (self.objType()) {
-            .String => std.debug.print("{s}", .{self.asObj().asString().characters}),
-        }
-    }
-
-    fn logObject(self: Self) void {
-        switch (self.objType()) {
-            .String => Logger.log(std.log.Level.err, .Result, "{s}", .{self.asObj().asString().characters}),
-        }
-    }
-
     pub fn printValue(self: Self) void {
         switch (self) {
             .number => std.debug.print("'{d:.3}'\n", .{self.number}),

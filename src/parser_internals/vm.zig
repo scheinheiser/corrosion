@@ -5,11 +5,13 @@ const Compiler = @import("compiler.zig");
 const Log = @import("../logger.zig");
 const Val = @import("value.zig");
 const obj = @import("obj.zig");
+const tbl = @import("table.zig");
 
 const Logger = Log.Logger;
 const Value = Val.Value;
 const Obj = obj.Obj;
 const ObjType = obj.ObjType;
+const Table = tbl.Table;
 
 const debug_trace_execution = false;
 const stack_max: usize = 256;
@@ -25,9 +27,13 @@ pub const VirtualMachine = struct {
 
     chunk: *Chunk.Chunk,
     ip: usize,
+
     stack: [stack_max]Value,
     stack_top: usize,
+
+    strings: Table,
     objects: ?*Obj,
+
     allocator: std.mem.Allocator,
 
     pub fn initVM() VirtualMachine {
@@ -36,6 +42,7 @@ pub const VirtualMachine = struct {
             .ip = undefined,
             .stack = undefined,
             .stack_top = undefined,
+            .strings = Table.init(),
             .objects = null,
             .allocator = std.heap.page_allocator,
         };
@@ -45,6 +52,7 @@ pub const VirtualMachine = struct {
     }
 
     pub fn deinitVM(self: *Self) void {
+        self.strings.deinit();
         self.freeObjects();
     }
 
@@ -134,7 +142,7 @@ pub const VirtualMachine = struct {
                         const res = self.binaryOperator(.op_add);
                         self.push(res);
                     } else {
-                        self.runtimeError("Operands must both be of strings or numbers.", .{});
+                        self.runtimeError("Operands must both be strings or numbers.", .{});
                         return InterpretResult.RUNTIME_ERROR;
                     }
                 },
@@ -175,11 +183,6 @@ pub const VirtualMachine = struct {
     }
 
     fn binaryOperator(self: *Self, op: Chunk.OpCode) Value {
-        if (!Value.isNum(self.peek(0)) or !Value.isNum(self.peek(1))) {
-            self.runtimeError("Operands must be numbers.", .{});
-            return Value.makeNil();
-        }
-
         const value2 = self.pop().asNumber();
         const value1 = self.pop().asNumber();
 
@@ -204,7 +207,7 @@ pub const VirtualMachine = struct {
             std.process.exit(1);
         };
 
-        const str = obj.String.copy(self, result);
+        const str = obj.String.takeString(self, result);
         self.push(Value.makeString(str));
     }
 };

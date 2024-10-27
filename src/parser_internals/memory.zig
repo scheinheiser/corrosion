@@ -44,8 +44,8 @@ pub fn DynArray(comptime T: type) type {
                 return;
             }
 
-            const result = self.allocator.realloc(self.items, new_size) catch |err| {
-                Logger.log(std.log.Level.err, .Memory, "Something something error -> {any}", .{err});
+            const result = self.allocator.realloc(self.items, new_size) catch {
+                Logger.log(std.log.Level.err, .Memory, "Ran out of memory to increase the size of the DynArray.", .{});
                 std.process.exit(1);
             };
 

@@ -19,6 +19,7 @@ pub const std_options: std.Options = std.Options{
         .{ .scope = .Debug, .level = .debug },
         .{ .scope = .Result, .level = .debug },
         .{ .scope = .REPL, .level = .debug },
+        .{ .scope = .HashTbl, .level = .debug },
     },
 };
 

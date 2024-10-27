@@ -8,7 +8,7 @@ pub const Logger = struct {
         args: anytype,
     ) void {
         const scope_prefix = "(" ++ comptime @tagName(scope) ++ "): ";
-        const prefix = "[" ++ comptime level.asText() ++ "] " ++ scope_prefix;
+        const prefix = "[" ++ comptime level.asText() ++ "] ~ " ++ scope_prefix;
 
         std.debug.lockStdErr();
         defer std.debug.unlockStdErr();
