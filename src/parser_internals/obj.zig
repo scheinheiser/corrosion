@@ -51,7 +51,7 @@ pub const String = struct {
         str.characters = characters;
         str.hash = hash;
 
-        _ = vm.strings.setValue(str, .nil);
+        _ = vm.strings.setValue(str, .nil, true) catch unreachable;
         return str;
     }
 

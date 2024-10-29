@@ -16,8 +16,10 @@ pub const OpCode = enum {
     op_mod,
 
     op_print,
-    op_def_global,
+    op_defconst_global,
+    op_defvar_global,
     op_get_global,
+    op_set_global,
     op_pop,
 
     op_not,

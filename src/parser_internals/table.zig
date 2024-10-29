@@ -12,6 +12,11 @@ const table_max_load: f32 = 0.75;
 pub const Entry = struct {
     key: ?*ObjString = null,
     value: Value = .nil,
+    constant: bool = true,
+};
+
+pub const TableError = error{
+    AssigningToConstant,
 };
 
 pub const Table = struct {
@@ -38,7 +43,7 @@ pub const Table = struct {
         self.capacity = 0;
     }
 
-    pub fn setValue(self: *Self, key: *ObjString, value: Value) bool {
+    pub fn setValue(self: *Self, key: *ObjString, value: Value, is_constant: bool) TableError!bool {
         const capacity: f32 = @floatFromInt(self.capacity);
         const count: f32 = @floatFromInt(self.count);
 
@@ -49,10 +54,13 @@ pub const Table = struct {
 
         const entry = findEntry(self.entries, key);
         const is_new_key = entry.key == null;
+
         if (is_new_key and entry.value.isNil()) self.count += 1;
+        if (!is_new_key and entry.constant) return TableError.AssigningToConstant;
 
         entry.key = key;
         entry.value = value;
+        entry.constant = is_constant;
         return is_new_key;
     }
 
@@ -70,7 +78,7 @@ pub const Table = struct {
     pub fn setAll(old: *Self, new: *Table) void {
         for (old.entries) |*entry| {
             if (entry.key != null) {
-                new.setValue(entry.key.?, entry.value);
+                new.setValue(entry.key.?, entry.value) catch unreachable;
             }
         }
     }

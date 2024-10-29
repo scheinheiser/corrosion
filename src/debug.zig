@@ -43,8 +43,10 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_equal => return simpleInstruction("OP_EQUAL", offset),
         .op_print => return simpleInstruction("OP_PRINT", offset),
         .op_pop => return simpleInstruction("OP_POP", offset),
-        .op_def_global => return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset),
+        .op_defconst_global => return constantInstruction("OP_DEFINE_CONSTANT_GLOBAL", chunk, offset),
+        .op_defvar_global => return constantInstruction("OP_DEFINE_VARIABLE_GLOBAL", chunk, offset),
         .op_get_global => return constantInstruction("OP_GET_GLOBAL", chunk, offset),
+        .op_set_global => return constantInstruction("OP_SET_GLOBAL", chunk, offset),
         else => {
             Logger.log(std.log.Level.warn, .Debug, "Unrecognised opcode -> {any}\n", .{instruction});
             return offset + 1;

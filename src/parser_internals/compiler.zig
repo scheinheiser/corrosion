@@ -53,7 +53,7 @@ pub const Precedence = enum {
     PRIMARY,
 };
 
-const ParseFn = *const fn (parser: *Parser) void;
+const ParseFn = *const fn (parser: *Parser, can_assign: bool) void;
 
 pub const ParseRule = struct {
     const Self = @This();
@@ -130,7 +130,7 @@ pub const Parser = struct {
         self.parsePrecedence(Precedence.ASSIGNMENT);
     }
 
-    fn varDeclaration(self: *Self) void {
+    fn varDeclaration(self: *Self, is_constant: bool) void {
         const global = self.parseIdenName("Expected variable identifier.");
 
         if (self.match(.equal)) {
@@ -140,12 +140,17 @@ pub const Parser = struct {
         }
 
         self.consume(.semicolon, "Expected ';' after variable declaration.");
-        self.defineVariable(global);
+
+        if (is_constant) {
+            self.defineConstant(global);
+        } else {
+            self.defineVariable(global);
+        }
     }
 
     fn exprStatement(self: *Self) void {
         self.expression();
-        self.consume(.semicolon, "Expected a ';' after the value.");
+        self.consume(.semicolon, "Expected a ';' after the expression.");
         self.emitByte(@intFromEnum(chk.OpCode.op_pop));
     }
 
@@ -179,7 +184,9 @@ pub const Parser = struct {
 
     pub fn declaration(self: *Self) void {
         if (self.match(.keyword_letv)) {
-            self.varDeclaration();
+            self.varDeclaration(false);
+        } else if (self.match(.keyword_let)) {
+            self.varDeclaration(true);
         } else {
             self.statement();
         }
@@ -215,33 +222,43 @@ pub const Parser = struct {
         self.errAtCurrent(message);
     }
 
-    fn grouping(self: *Self) void {
+    fn grouping(self: *Self, can_assign: bool) void {
+        _ = can_assign;
         self.expression();
         self.consume(sc.Tag.rightbracket, "Expected a ')' after the expression.");
     }
 
-    fn number(self: *Self) void {
+    fn number(self: *Self, can_assign: bool) void {
+        _ = can_assign;
         const value = std.fmt.parseFloat(f32, self.prev.lexeme) catch unreachable;
         self.emitConstant(Value.makeNumber(value));
     }
 
-    fn string(self: *Self) void {
+    fn string(self: *Self, can_assign: bool) void {
+        _ = can_assign;
         const obj_string = self.prev.lexeme[1 .. self.prev.lexeme.len - 1];
         const copied_string = obj.String.copy(self.vm, obj_string);
 
         self.emitConstant(Value.makeString(copied_string));
     }
 
-    fn variable(self: *Self) void {
-        self.namedVariable(&self.prev);
+    fn variable(self: *Self, can_assign: bool) void {
+        self.namedVariable(&self.prev, can_assign);
     }
 
-    fn namedVariable(self: *Self, name: *sc.Token) void {
+    fn namedVariable(self: *Self, name: *sc.Token, can_assign: bool) void {
         const arg = self.constIdentifier(name);
-        self.emitBytes(@intFromEnum(chk.OpCode.op_get_global), arg);
+
+        if (self.match(.equal) and can_assign) {
+            self.expression();
+            self.emitBytes(@intFromEnum(chk.OpCode.op_set_global), arg);
+        } else {
+            self.emitBytes(@intFromEnum(chk.OpCode.op_get_global), arg);
+        }
     }
 
-    fn unary(self: *Self) void {
+    fn unary(self: *Self, can_assign: bool) void {
+        _ = can_assign;
         const operatorT = self.prev.type;
         self.parsePrecedence(Precedence.UNARY);
 
@@ -252,7 +269,8 @@ pub const Parser = struct {
         }
     }
 
-    fn binary(self: *Self) void {
+    fn binary(self: *Self, can_assign: bool) void {
+        _ = can_assign;
         const operatorT = self.prev.type;
         const rule = getRule(operatorT);
 
@@ -275,7 +293,8 @@ pub const Parser = struct {
         }
     }
 
-    fn literal(self: *Self) void {
+    fn literal(self: *Self, can_assign: bool) void {
+        _ = can_assign;
         switch (self.prev.type) {
             .keyword_nil => self.emitByte(@intFromEnum(chk.OpCode.op_nil)),
             .keyword_true => self.emitByte(@intFromEnum(chk.OpCode.op_true)),
@@ -293,11 +312,17 @@ pub const Parser = struct {
             return;
         }
 
-        prefix_rule.?(self);
+        const can_assign = @intFromEnum(precedence) <= @intFromEnum(Precedence.ASSIGNMENT);
+        prefix_rule.?(self, can_assign);
+
         while (@intFromEnum(precedence) <= @intFromEnum(getRule(self.current.type).precedence)) {
             self.advance();
             const infix_rule = getRule(self.prev.type).infix;
-            infix_rule.?(self);
+            infix_rule.?(self, can_assign);
+        }
+
+        if (can_assign and self.match(.equal)) {
+            self.err("Invalid assignment target.");
         }
     }
 
@@ -311,7 +336,11 @@ pub const Parser = struct {
     }
 
     fn defineVariable(self: *Self, global_idx: u8) void {
-        self.emitBytes(@intFromEnum(chk.OpCode.op_def_global), global_idx);
+        self.emitBytes(@intFromEnum(chk.OpCode.op_defvar_global), global_idx);
+    }
+
+    fn defineConstant(self: *Self, global_idx: u8) void {
+        self.emitBytes(@intFromEnum(chk.OpCode.op_defconst_global), global_idx);
     }
 
     fn emitByte(self: *Self, byte: u8) void {

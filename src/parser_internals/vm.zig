@@ -159,11 +159,15 @@ pub const VirtualMachine = struct {
                     return .OK;
                 },
                 .op_pop => _ = self.pop(),
-                .op_def_global => {
+                .op_defvar_global, .op_defconst_global => |declaration_op| {
                     const global = self.chunk.constants.items[self.getNextByte()];
                     const name = global.asString();
 
-                    _ = self.globals.setValue(name, self.peek(0));
+                    switch (declaration_op) {
+                        .op_defvar_global => _ = self.globals.setValue(name, self.peek(0), false) catch unreachable,
+                        .op_defconst_global => _ = self.globals.setValue(name, self.peek(0), true) catch unreachable,
+                        else => unreachable,
+                    }
                     _ = self.pop();
                 },
                 .op_get_global => {
@@ -177,6 +181,21 @@ pub const VirtualMachine = struct {
                     }
 
                     self.push(val);
+                },
+                .op_set_global => {
+                    const global = self.chunk.constants.items[self.getNextByte()];
+                    const name = global.asString();
+
+                    const res = self.globals.setValue(name, self.peek(0), false) catch {
+                        self.runtimeError("Cannot reassign to a constant.", .{});
+                        return InterpretResult.RUNTIME_ERROR;
+                    };
+
+                    if (res) {
+                        _ = self.globals.deleteValue(name);
+                        self.runtimeError("Undefined variable - {s}", .{name.characters});
+                        return InterpretResult.RUNTIME_ERROR;
+                    }
                 },
                 else => {},
             }
