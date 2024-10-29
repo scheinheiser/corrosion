@@ -22,11 +22,11 @@ pub fn DynArray(comptime T: type) type {
             };
         }
 
-        pub fn growCapacity(self: *Self) usize {
+        pub fn growCapacity(self: *Self) void {
             if (self.capacity < 8) {
-                return 8;
+                self.capacity = 8;
             } else {
-                return self.capacity * 2;
+                self.capacity *= 2;
             }
         }
 

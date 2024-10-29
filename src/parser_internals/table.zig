@@ -111,13 +111,14 @@ pub const Table = struct {
         }
     }
 
-    fn getValue(self: *Self, key: *ObjString) Value {
-        if (self.count == 0) return .nil;
+    pub fn getValue(self: *Self, key: *ObjString, value: *Value) bool {
+        if (self.count == 0) return false;
 
         const entry = findEntry(self.entries, key);
-        if (entry.key == null) return .nil;
+        if (entry.key == null) return false;
 
-        return entry.value;
+        value.* = entry.value;
+        return true;
     }
 
     fn adjustCapacity(self: *Self) void {

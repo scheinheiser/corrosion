@@ -15,6 +15,11 @@ pub const OpCode = enum {
     op_divide,
     op_mod,
 
+    op_print,
+    op_def_global,
+    op_get_global,
+    op_pop,
+
     op_not,
     op_greater,
     op_equal,
@@ -53,8 +58,8 @@ pub const Chunk = struct {
 
     pub fn writeToChunk(self: *Self, data: u8, line: i32) void {
         if (self.code.capacity < self.code.count + 1) {
-            self.code.capacity = self.code.growCapacity();
-            self.lines.capacity = self.lines.growCapacity();
+            self.code.growCapacity();
+            self.lines.growCapacity();
 
             self.code.growArray(self.code.capacity);
             self.lines.growArray(self.lines.capacity);
@@ -69,7 +74,7 @@ pub const Chunk = struct {
 
     pub fn addConstant(self: *Self, value: Value) u8 {
         if (self.constants.capacity < self.constants.count + 1) {
-            self.constants.capacity = self.constants.growCapacity();
+            self.constants.growCapacity();
 
             self.constants.growArray(self.constants.capacity);
         }

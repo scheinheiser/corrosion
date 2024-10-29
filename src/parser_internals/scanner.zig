@@ -21,6 +21,8 @@ pub const Tag = enum {
     bang, // !
     greater_than, // >
     less_than, // <
+    semicolon, // ;
+    equal, // =
 
     // Double character tokens
     bang_equal, // !=
@@ -30,21 +32,19 @@ pub const Tag = enum {
 
     // Keywords
     keyword_print,
-    keyword_defvar,
-    keyword_defconstant,
-    keyword_set,
-    keyword_setq,
-    keyword_setf,
-    keyword_write,
-    keyword_writeline,
     keyword_return,
     keyword_fn,
     keyword_and,
     keyword_or,
     keyword_nil,
     keyword_if,
+    keyword_for,
+    keyword_while,
     keyword_false,
     keyword_true,
+    keyword_let,
+    keyword_letv,
+    keyword_struct,
 
     // Literals
     string,
@@ -115,12 +115,13 @@ pub const Scanner = struct {
             '*' => return self.makeToken(Tag.multiply),
             '/' => return self.makeToken(Tag.divide),
             '!' => return self.makeToken(if (self.match('=') == true) Tag.bang_equal else Tag.bang),
+            ';' => return self.makeToken(Tag.semicolon),
             '%' => return self.makeToken(Tag.mod),
             '=' => {
                 if (self.match('=') == true) {
                     return self.makeToken(Tag.equal_equal);
                 } else {
-                    return self.errorToken("Single '='.");
+                    return self.makeToken(Tag.equal);
                 }
             },
             '>' => return self.makeToken(if (self.match('=') == true) Tag.greater_than_eql_to else Tag.greater_than),
@@ -152,9 +153,6 @@ pub const Scanner = struct {
                     self.line += 1;
                     _ = self.advance();
                 },
-                ';' => {
-                    while (self.peek() != '\n' and !self.isAtEnd()) _ = self.advance();
-                },
                 else => break,
             }
         }
@@ -163,33 +161,11 @@ pub const Scanner = struct {
     fn identifierType(self: *Self) Tag {
         switch (self.source[self.start]) {
             'p' => return self.checkKeyword("print", Tag.keyword_print),
-            'd' => switch (self.source[self.start + 3]) {
-                'v' => return self.checkKeyword("defvar", Tag.keyword_defvar),
-                'c' => return self.checkKeyword("defconstant", Tag.keyword_defconstant),
-                else => return Tag.identifier,
-            },
-            's' => {
-                if (!isAlpha(self.source[self.start + 3])) {
-                    return self.checkKeyword("set", Tag.keyword_set);
-                } else {
-                    switch (self.source[self.start + 3]) {
-                        'q' => return self.checkKeyword("setq", Tag.keyword_setq),
-                        'f' => return self.checkKeyword("setf", Tag.keyword_setf),
-                        else => return Tag.identifier,
-                    }
-                }
-            },
-            'w' => {
-                if (!isAlpha(self.source[self.start + 5])) {
-                    return self.checkKeyword("write", Tag.keyword_write);
-                } else {
-                    return self.checkKeyword("writeline", Tag.keyword_writeline);
-                }
-            },
             'r' => return self.checkKeyword("return", Tag.keyword_return),
             'f' => switch (self.source[self.start + 1]) {
                 'n' => return self.checkKeyword("fn", Tag.keyword_fn),
                 'a' => return self.checkKeyword("false", Tag.keyword_false),
+                'o' => return self.checkKeyword("for", Tag.keyword_for),
                 else => return Tag.identifier,
             },
             'a' => return self.checkKeyword("and", Tag.keyword_and),
@@ -197,6 +173,13 @@ pub const Scanner = struct {
             'n' => return self.checkKeyword("nil", Tag.keyword_nil),
             'i' => return self.checkKeyword("if", Tag.keyword_if),
             't' => return self.checkKeyword("true", Tag.keyword_true),
+            's' => return self.checkKeyword("struct", Tag.keyword_struct),
+            'w' => return self.checkKeyword("while", Tag.keyword_while),
+            'l' => if (isAlpha(self.source[self.start + 3])) {
+                return self.checkKeyword("letv", Tag.keyword_letv);
+            } else {
+                return self.checkKeyword("let", Tag.keyword_let);
+            },
             else => return Tag.identifier,
         }
     }

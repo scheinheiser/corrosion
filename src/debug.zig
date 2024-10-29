@@ -41,6 +41,10 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_greater => return simpleInstruction("OP_GREATER", offset),
         .op_less => return simpleInstruction("OP_LESS", offset),
         .op_equal => return simpleInstruction("OP_EQUAL", offset),
+        .op_print => return simpleInstruction("OP_PRINT", offset),
+        .op_pop => return simpleInstruction("OP_POP", offset),
+        .op_def_global => return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset),
+        .op_get_global => return constantInstruction("OP_GET_GLOBAL", chunk, offset),
         else => {
             Logger.log(std.log.Level.warn, .Debug, "Unrecognised opcode -> {any}\n", .{instruction});
             return offset + 1;

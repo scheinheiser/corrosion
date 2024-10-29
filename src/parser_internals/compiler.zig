@@ -17,7 +17,7 @@ const VM = VirtualMachine.VirtualMachine;
 const debug_print_code = true;
 
 fn endCompiler(parser: *Parser) void {
-    parser.*.emitReturn();
+    parser.emitReturn();
     if (comptime debug_print_code) {
         if (!parser.had_error) {
             Debug.dissassembleChunk(parser.currentChunk().*, "code");
@@ -30,8 +30,10 @@ pub fn compile(source: []const u8, vm: *VM, chunk: *Chunk) bool {
     var parser = Parser.init(scanner, chunk, vm);
 
     parser.advance();
-    parser.expression();
-    parser.consume(sc.Tag.EOF, "Expect end of expression.");
+
+    while (!parser.match(sc.Tag.EOF)) {
+        parser.declaration();
+    }
 
     endCompiler(&parser);
     return !parser.had_error;
@@ -81,6 +83,7 @@ fn getRule(token_type: sc.Tag) ParseRule {
         .bang_equal, .equal_equal => ParseRule.init(null, Parser.binary, Precedence.EQUALITY),
         .greater_than, .greater_than_eql_to, .less_than, .less_than_eql_to => ParseRule.init(null, Parser.binary, Precedence.COMPARISON),
         .string => ParseRule.init(Parser.string, null, Precedence.NONE),
+        .identifier => ParseRule.init(Parser.variable, null, Precedence.NONE),
         else => ParseRule.init(null, null, Precedence.NONE),
     };
 }
@@ -127,6 +130,82 @@ pub const Parser = struct {
         self.parsePrecedence(Precedence.ASSIGNMENT);
     }
 
+    fn varDeclaration(self: *Self) void {
+        const global = self.parseIdenName("Expected variable identifier.");
+
+        if (self.match(.equal)) {
+            self.expression();
+        } else {
+            self.emitByte(@intFromEnum(chk.OpCode.op_nil));
+        }
+
+        self.consume(.semicolon, "Expected ';' after variable declaration.");
+        self.defineVariable(global);
+    }
+
+    fn exprStatement(self: *Self) void {
+        self.expression();
+        self.consume(.semicolon, "Expected a ';' after the value.");
+        self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+    }
+
+    fn printStatement(self: *Self) void {
+        self.expression();
+        self.consume(.semicolon, "Expected ';' after the value.");
+        self.emitByte(@intFromEnum(chk.OpCode.op_print));
+    }
+
+    fn synchronise(self: *Self) void {
+        self.panic_mode = false;
+
+        while (self.current.type == .EOF) {
+            if (self.prev.type == .semicolon) return;
+            switch (self.current.type) {
+                .keyword_struct,
+                .keyword_fn,
+                .keyword_let,
+                .keyword_letv,
+                .keyword_if,
+                .keyword_while,
+                .keyword_print,
+                .keyword_return,
+                => return,
+                else => {},
+            }
+
+            self.advance();
+        }
+    }
+
+    pub fn declaration(self: *Self) void {
+        if (self.match(.keyword_letv)) {
+            self.varDeclaration();
+        } else {
+            self.statement();
+        }
+
+        if (self.panic_mode) self.synchronise();
+    }
+
+    fn statement(self: *Self) void {
+        if (self.match(sc.Tag.keyword_print)) {
+            self.printStatement();
+        } else {
+            self.exprStatement();
+        }
+    }
+
+    pub fn match(self: *Self, t_type: sc.Tag) bool {
+        if (!self.checkType(t_type)) return false;
+
+        self.advance();
+        return true;
+    }
+
+    fn checkType(self: *Self, t_type: sc.Tag) bool {
+        return self.current.type == t_type;
+    }
+
     pub fn consume(self: *Self, t_type: sc.Tag, message: []const u8) void {
         if (self.current.type == t_type) {
             self.advance();
@@ -151,6 +230,15 @@ pub const Parser = struct {
         const copied_string = obj.String.copy(self.vm, obj_string);
 
         self.emitConstant(Value.makeString(copied_string));
+    }
+
+    fn variable(self: *Self) void {
+        self.namedVariable(&self.prev);
+    }
+
+    fn namedVariable(self: *Self, name: *sc.Token) void {
+        const arg = self.constIdentifier(name);
+        self.emitBytes(@intFromEnum(chk.OpCode.op_get_global), arg);
     }
 
     fn unary(self: *Self) void {
@@ -211,6 +299,19 @@ pub const Parser = struct {
             const infix_rule = getRule(self.prev.type).infix;
             infix_rule.?(self);
         }
+    }
+
+    fn constIdentifier(self: *Self, name: *sc.Token) u8 {
+        return self.makeConstant(Value.makeString(obj.String.copy(self.vm, name.lexeme)));
+    }
+
+    fn parseIdenName(self: *Self, err_message: []const u8) u8 {
+        self.consume(.identifier, err_message);
+        return self.constIdentifier(&self.prev);
+    }
+
+    fn defineVariable(self: *Self, global_idx: u8) void {
+        self.emitBytes(@intFromEnum(chk.OpCode.op_def_global), global_idx);
     }
 
     fn emitByte(self: *Self, byte: u8) void {

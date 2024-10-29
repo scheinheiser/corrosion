@@ -84,7 +84,7 @@ pub const Value = union(enum) {
                 else => false,
             },
             .string => switch (b.*) {
-                .string => std.mem.eql(u8, a.asString().characters, b.asString().characters),
+                .string => a.asString() == b.asString(),
                 else => false,
             },
         };
@@ -92,19 +92,19 @@ pub const Value = union(enum) {
 
     pub fn printValue(self: Self) void {
         switch (self) {
-            .number => std.debug.print("'{d:.3}'\n", .{self.number}),
-            .boolean => std.debug.print("'{any}'\n", .{self.boolean}),
-            .nil => std.debug.print("'nil'\n", .{}),
+            .number => std.debug.print("{d:.3}\n", .{self.number}),
+            .boolean => std.debug.print("{any}\n", .{self.boolean}),
+            .nil => std.debug.print("nil\n", .{}),
             .string => std.debug.print("{s}\n", .{self.asString().characters}),
         }
     }
 
     pub fn logValue(self: Self) void {
         switch (self) {
-            .number => Logger.log(std.log.Level.debug, .Result, "{d:.3}", .{self.number}),
-            .boolean => Logger.log(std.log.Level.debug, .Result, "{any}", .{self.boolean}),
-            .nil => Logger.log(std.log.Level.debug, .Result, "nil", .{}),
-            .string => Logger.log(std.log.Level.debug, .Result, "{s}", .{self.asString().characters}),
+            .number => Logger.log(std.log.Level.debug, .Result, "'{d:.3}'", .{self.number}),
+            .boolean => Logger.log(std.log.Level.debug, .Result, "'{any}'", .{self.boolean}),
+            .nil => Logger.log(std.log.Level.debug, .Result, "'nil'", .{}),
+            .string => Logger.log(std.log.Level.debug, .Result, "'{s}'", .{self.asString().characters}),
         }
     }
 };

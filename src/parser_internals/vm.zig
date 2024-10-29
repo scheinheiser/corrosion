@@ -32,6 +32,7 @@ pub const VirtualMachine = struct {
     stack_top: usize,
 
     strings: Table,
+    globals: Table,
     objects: ?*Obj,
 
     allocator: std.mem.Allocator,
@@ -41,8 +42,9 @@ pub const VirtualMachine = struct {
             .chunk = undefined,
             .ip = undefined,
             .stack = undefined,
-            .stack_top = undefined,
+            .stack_top = 0,
             .strings = Table.init(),
+            .globals = Table.init(),
             .objects = null,
             .allocator = std.heap.page_allocator,
         };
@@ -52,6 +54,7 @@ pub const VirtualMachine = struct {
     }
 
     pub fn deinitVM(self: *Self) void {
+        self.globals.deinit();
         self.strings.deinit();
         self.freeObjects();
     }
@@ -106,12 +109,7 @@ pub const VirtualMachine = struct {
 
             const value: Chunk.OpCode = @enumFromInt(self.getNextByte());
             switch (value) {
-                .op_return => {
-                    var discarded_value = self.pop();
-                    discarded_value.logValue();
-
-                    return InterpretResult.OK;
-                },
+                .op_return => return .OK,
                 .op_const => {
                     const constant = self.chunk.constants.items[self.getNextByte()];
                     self.push(constant);
@@ -155,6 +153,30 @@ pub const VirtualMachine = struct {
                     const value1 = self.pop();
 
                     self.push(Value.makeBool(Value.checkEquality(&value1, &value2)));
+                },
+                .op_print => {
+                    Value.printValue(self.pop());
+                    return .OK;
+                },
+                .op_pop => _ = self.pop(),
+                .op_def_global => {
+                    const global = self.chunk.constants.items[self.getNextByte()];
+                    const name = global.asString();
+
+                    _ = self.globals.setValue(name, self.peek(0));
+                    _ = self.pop();
+                },
+                .op_get_global => {
+                    const global = self.chunk.constants.items[self.getNextByte()];
+                    const name = global.asString();
+                    var val: Value = undefined;
+
+                    if (!self.globals.getValue(name, &val)) {
+                        self.runtimeError("Undefined variable - '{s}'", .{name.characters});
+                        return InterpretResult.RUNTIME_ERROR;
+                    }
+
+                    self.push(val);
                 },
                 else => {},
             }
