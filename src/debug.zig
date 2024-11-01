@@ -45,6 +45,8 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_not => return simpleInstruction("OP_NOT", offset),
         .op_greater => return simpleInstruction("OP_GREATER", offset),
         .op_less => return simpleInstruction("OP_LESS", offset),
+        .op_greater_eql => return simpleInstruction("OP_GREATER_EQL", offset),
+        .op_less_eql => return simpleInstruction("OP_LESS_EQL", offset),
         .op_equal => return simpleInstruction("OP_EQUAL", offset),
         .op_print => return simpleInstruction("OP_PRINT", offset),
         .op_pop => return simpleInstruction("OP_POP", offset),

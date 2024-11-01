@@ -28,8 +28,10 @@ pub const OpCode = enum {
 
     op_not,
     op_greater,
-    op_equal,
+    op_greater_eql,
     op_less,
+    op_less_eql,
+    op_equal,
 
     op_nil,
     op_true,

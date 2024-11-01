@@ -133,7 +133,7 @@ fn getRule(token_type: sc.Tag) ParseRule {
         .divide, .multiply, .mod => ParseRule.init(null, Parser.binary, Precedence.FACTOR),
         .integer, .float => ParseRule.init(Parser.number, null, Precedence.NONE),
         .keyword_false, .keyword_true, .keyword_nil => ParseRule.init(Parser.literal, null, Precedence.NONE),
-        .bang => ParseRule.init(Parser.unary, null, Precedence.NONE),
+        .bang, .abs => ParseRule.init(Parser.unary, null, Precedence.NONE),
         .bang_equal, .equal_equal => ParseRule.init(null, Parser.binary, Precedence.EQUALITY),
         .greater_than, .greater_than_eql_to, .less_than, .less_than_eql_to => ParseRule.init(null, Parser.binary, Precedence.COMPARISON),
         .string => ParseRule.init(Parser.string, null, Precedence.NONE),
@@ -279,9 +279,11 @@ pub const Parser = struct {
         if (self.match(.semicolon)) {
             // No initialier was added.
         } else if (self.match(.keyword_let)) {
-            self.varDeclaration(true);
-        } else if (self.match(.keyword_letv)) {
-            self.varDeclaration(false);
+            if (self.match(.keyword_mut)) {
+                self.varDeclaration(false);
+            } else {
+                self.varDeclaration(true);
+            }
         } else {
             self.exprStatement();
         }
@@ -330,7 +332,6 @@ pub const Parser = struct {
                 .keyword_struct,
                 .keyword_fn,
                 .keyword_let,
-                .keyword_letv,
                 .keyword_if,
                 .keyword_while,
                 .keyword_for,
@@ -345,10 +346,12 @@ pub const Parser = struct {
     }
 
     pub fn declaration(self: *Self) void {
-        if (self.match(.keyword_letv)) {
-            self.varDeclaration(false);
-        } else if (self.match(.keyword_let)) {
-            self.varDeclaration(true);
+        if (self.match(.keyword_let)) {
+            if (self.match(.keyword_mut)) {
+                self.varDeclaration(false);
+            } else {
+                self.varDeclaration(true);
+            }
         } else {
             self.statement();
         }
@@ -448,6 +451,7 @@ pub const Parser = struct {
         switch (operatorT) {
             .subtract => self.emitByte(@intFromEnum(chk.OpCode.op_negate)),
             .bang => self.emitByte(@intFromEnum(chk.OpCode.op_not)),
+            .abs => self.emitByte(@intFromEnum(chk.OpCode.op_abs)),
             else => unreachable,
         }
     }
@@ -468,8 +472,8 @@ pub const Parser = struct {
             .mod => self.emitByte(@intFromEnum(chk.OpCode.op_mod)),
             .less_than => self.emitByte(@intFromEnum(chk.OpCode.op_less)),
             .greater_than => self.emitByte(@intFromEnum(chk.OpCode.op_greater)),
-            .less_than_eql_to => self.emitBytes(@intFromEnum(chk.OpCode.op_less), @intFromEnum(chk.OpCode.op_equal)),
-            .greater_than_eql_to => self.emitBytes(@intFromEnum(chk.OpCode.op_greater), @intFromEnum(chk.OpCode.op_equal)),
+            .less_than_eql_to => self.emitByte(@intFromEnum(chk.OpCode.op_less_eql)),
+            .greater_than_eql_to => self.emitByte(@intFromEnum(chk.OpCode.op_greater_eql)),
             .equal_equal => self.emitByte(@intFromEnum(chk.OpCode.op_equal)),
             .bang_equal => self.emitBytes(@intFromEnum(chk.OpCode.op_not), @intFromEnum(chk.OpCode.op_equal)),
             else => unreachable,

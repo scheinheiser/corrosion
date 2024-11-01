@@ -124,9 +124,18 @@ pub const VirtualMachine = struct {
                     const negated_value = self.pop().asNumber() * -1;
                     self.push(Value.makeNumber(negated_value));
                 },
-                //TODO: Get this actually useable again (maybe a |value| syntax?).
-                .op_abs => self.push(Value.makeNumber(if (self.pop().asNumber() > 0) self.pop().asNumber() else self.pop().asNumber() * -1)),
-                .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less, .op_mod => |op| {
+                .op_abs => {
+                    if (!Value.isNum(self.peek(0))) {
+                        self.runtimeError("Operand must be a number.", .{});
+                        return InterpretResult.RUNTIME_ERROR;
+                    }
+
+                    const val = self.pop().asNumber();
+                    const absolute = if (val > 0) val else val * -1;
+
+                    self.push(Value.makeNumber(absolute));
+                },
+                .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less, .op_mod, .op_greater_eql, .op_less_eql => |op| {
                     const res = self.binaryOperator(op);
                     if (res == .nil) {
                         self.runtimeError("The operands must be numbers.", .{});
@@ -262,6 +271,8 @@ pub const VirtualMachine = struct {
             .op_mod => return Value.makeNumber(@mod(value1, value2)),
             .op_less => return Value.makeBool(value1 < value2),
             .op_greater => return Value.makeBool(value1 > value2),
+            .op_greater_eql => return Value.makeBool(value1 >= value2),
+            .op_less_eql => return Value.makeBool(value1 <= value2),
             else => unreachable,
         }
     }

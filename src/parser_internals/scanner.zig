@@ -23,6 +23,7 @@ pub const Tag = enum {
     less_than, // <
     semicolon, // ;
     equal, // =
+    abs, // ~
 
     // Double character tokens
     bang_equal, // !=
@@ -44,7 +45,7 @@ pub const Tag = enum {
     keyword_false,
     keyword_true,
     keyword_let,
-    keyword_letv,
+    keyword_mut,
     keyword_struct,
 
     // Literals
@@ -120,6 +121,7 @@ pub const Scanner = struct {
             '!' => return self.makeToken(if (self.match('=') == true) Tag.bang_equal else Tag.bang),
             ';' => return self.makeToken(Tag.semicolon),
             '%' => return self.makeToken(Tag.mod),
+            '~' => return self.makeToken(Tag.abs),
             '=' => {
                 if (self.match('=') == true) {
                     return self.makeToken(Tag.equal_equal);
@@ -178,11 +180,8 @@ pub const Scanner = struct {
             't' => return self.checkKeyword("true", Tag.keyword_true),
             's' => return self.checkKeyword("struct", Tag.keyword_struct),
             'w' => return self.checkKeyword("while", Tag.keyword_while),
-            'l' => if (isAlpha(self.source[self.start + 3])) {
-                return self.checkKeyword("letv", Tag.keyword_letv);
-            } else {
-                return self.checkKeyword("let", Tag.keyword_let);
-            },
+            'l' => return self.checkKeyword("let", Tag.keyword_let),
+            'm' => return self.checkKeyword("mut", Tag.keyword_mut),
             'e' => return self.checkKeyword("else", Tag.keyword_else),
             else => return Tag.identifier,
         }
