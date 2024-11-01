@@ -35,7 +35,7 @@ pub fn main() !void {
         1 => repl(&virtual),
         2 => try runFile(args[1], &virtual, allocator),
         else => {
-            Logger.log(std.log.Level.err, .REPL, @src(), "Usage: buzz [path]\n", .{});
+            Logger.log(std.log.Level.err, .REPL, null, "Usage: buzz [path]\n", .{});
             std.process.exit(64);
         },
     };

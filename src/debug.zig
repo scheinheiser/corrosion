@@ -33,7 +33,7 @@ pub fn dissassembleInstruction(chunk: Chunk.Chunk, offset: usize) usize {
         .op_return => return simpleInstruction("OP_RETURN", offset),
         .op_const => return constantInstruction("OP_CONSTANT", chunk, offset),
         .op_negate => return simpleInstruction("OP_NEGATE", offset),
-        // .op_abs => return simpleInstruction("OP_ABSOLUTE", offset),
+        .op_abs => return simpleInstruction("OP_ABSOLUTE", offset),
         .op_add => return simpleInstruction("OP_ADD", offset),
         .op_subtract => return simpleInstruction("OP_SUBTRACT", offset),
         .op_multiply => return simpleInstruction("OP_MULTIPLY", offset),

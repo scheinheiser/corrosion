@@ -74,8 +74,8 @@ pub const VirtualMachine = struct {
     }
 
     fn runtimeError(self: *Self, comptime text: []const u8, args: anytype) void {
-        Logger.log(std.log.Level.err, .VM, @src(), text, args);
-        Logger.log(std.log.Level.err, .VM, @src(), "[line {d}] in script.", .{self.chunk.lines.items[self.ip]});
+        Logger.log(std.log.Level.err, .VM, null, text, args);
+        Logger.log(std.log.Level.err, .VM, null, "[line {d}] in script.", .{self.chunk.lines.items[self.ip]});
 
         self.resetStack();
     }

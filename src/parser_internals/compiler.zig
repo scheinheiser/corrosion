@@ -657,11 +657,11 @@ pub const Parser = struct {
         if (self.panic_mode) return;
 
         if (token.type == sc.Tag.EOF) {
-            Logger.log(std.log.Level.err, .Compiler, @src(), "[line {any}] Error at EOF - {s}", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, null, "[line {any}] Error at EOF - {s}", .{ token.line, message });
         } else if (token.type == sc.Tag.error_token) {
-            Logger.log(std.log.Level.err, .Compiler, @src(), "[line {any}] Error - {s}", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, null, "[line {any}] Error - {s}", .{ token.line, message });
         } else {
-            Logger.log(std.log.Level.err, .Compiler, @src(), "[line {any}] Error at '{s}' - {s}", .{ token.line, token.lexeme, message });
+            Logger.log(std.log.Level.err, .Compiler, null, "[line {any}] Error at '{s}' - {s}", .{ token.line, token.lexeme, message });
         }
 
         self.panic_mode = true;
