@@ -15,6 +15,8 @@ const Obj = obj.Obj;
 const VM = VirtualMachine.VirtualMachine;
 
 const debug_print_code = true;
+const max_locals = 256;
+var compiler: Compiler = undefined;
 
 fn endCompiler(parser: *Parser) void {
     parser.emitReturn();
@@ -28,6 +30,7 @@ fn endCompiler(parser: *Parser) void {
 pub fn compile(source: []const u8, vm: *VM, chunk: *Chunk) bool {
     const scanner = Scanner.init(source);
     var parser = Parser.init(scanner, chunk, vm);
+    compiler = Compiler.init();
 
     parser.advance();
 
@@ -38,6 +41,57 @@ pub fn compile(source: []const u8, vm: *VM, chunk: *Chunk) bool {
     endCompiler(&parser);
     return !parser.had_error;
 }
+
+pub const Compiler = struct {
+    const Self = @This();
+
+    locals: [max_locals]Local,
+    local_count: usize,
+    scope_depth: i32,
+
+    pub fn init() Compiler {
+        return Compiler{
+            .locals = undefined,
+            .local_count = 0,
+            .scope_depth = 0,
+        };
+    }
+
+    pub fn addLocal(self: *Self, parser: *Parser, name: sc.Token) void {
+        if (self.local_count == max_locals) {
+            parser.err("Too many variables are in the function/loop.");
+            return;
+        }
+        self.local_count += 1;
+
+        var local = &self.locals[self.local_count];
+
+        local.name = name;
+        local.depth = -1;
+    }
+
+    pub fn resolveLocal(self: *Self, parser: *Parser, name: *sc.Token) ?usize {
+        var idx: usize = compiler.local_count;
+        while (idx > 0) : (idx -= 1) {
+            const local = self.locals[idx];
+            if (std.mem.eql(u8, name.lexeme, local.name.lexeme)) {
+                if (local.depth == -1) parser.err("Cannot read a local variable in its own initialiser.");
+                return idx - 1;
+            }
+        }
+
+        return null;
+    }
+
+    pub fn markInitialised(self: *Self) void {
+        self.locals[self.local_count].depth = self.scope_depth;
+    }
+};
+
+pub const Local = struct {
+    name: sc.Token,
+    depth: i32,
+};
 
 pub const Precedence = enum {
     NONE,
@@ -84,6 +138,8 @@ fn getRule(token_type: sc.Tag) ParseRule {
         .greater_than, .greater_than_eql_to, .less_than, .less_than_eql_to => ParseRule.init(null, Parser.binary, Precedence.COMPARISON),
         .string => ParseRule.init(Parser.string, null, Precedence.NONE),
         .identifier => ParseRule.init(Parser.variable, null, Precedence.NONE),
+        .keyword_and => ParseRule.init(null, Parser._and, Precedence.AND),
+        .keyword_or => ParseRule.init(null, Parser._or, Precedence.OR),
         else => ParseRule.init(null, null, Precedence.NONE),
     };
 }
@@ -93,11 +149,13 @@ pub const Parser = struct {
 
     current: sc.Token,
     prev: sc.Token,
-    scanner: Scanner,
-    compiling_chunk: *Chunk,
+
     had_error: bool,
     panic_mode: bool,
+
     vm: *VM,
+    scanner: Scanner,
+    compiling_chunk: *Chunk,
 
     pub fn init(scanner: Scanner, chunk: *Chunk, vm: *VM) Parser {
         return Parser{
@@ -126,12 +184,33 @@ pub const Parser = struct {
         }
     }
 
-    pub fn expression(self: *Self) void {
+    fn expression(self: *Self) void {
         self.parsePrecedence(Precedence.ASSIGNMENT);
     }
 
+    fn beginScope() void {
+        compiler.scope_depth += 1;
+    }
+
+    fn endScope(self: *Self) void {
+        compiler.scope_depth -= 1;
+
+        while (compiler.local_count > 0 and compiler.locals[compiler.local_count - 1].depth > compiler.scope_depth) {
+            self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+            compiler.local_count -= 1;
+        }
+    }
+
+    fn block(self: *Self) void {
+        while (!self.checkType(.rightbrace) and !self.checkType(.EOF)) {
+            self.declaration();
+        }
+
+        self.consume(.rightbrace, "Expected '}' after the block.");
+    }
+
     fn varDeclaration(self: *Self, is_constant: bool) void {
-        const global = self.parseIdenName("Expected variable identifier.");
+        const global = self.parseVariable("Expected variable identifier.");
 
         if (self.match(.equal)) {
             self.expression();
@@ -154,10 +233,92 @@ pub const Parser = struct {
         self.emitByte(@intFromEnum(chk.OpCode.op_pop));
     }
 
+    fn ifStatement(self: *Self) void {
+        self.consume(.leftbracket, "Expected a '(' to begin the 'if' condition.");
+        self.expression();
+        self.consume(.rightbracket, "Expected a ')' to end the 'if' condition.");
+
+        const then_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump_if_false));
+        self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+        self.statement();
+
+        const else_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump));
+
+        self.patchJump(then_jump);
+        self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+
+        if (self.match(.keyword_else)) self.statement();
+        self.patchJump(else_jump);
+    }
+
     fn printStatement(self: *Self) void {
         self.expression();
         self.consume(.semicolon, "Expected ';' after the value.");
         self.emitByte(@intFromEnum(chk.OpCode.op_print));
+    }
+
+    fn whileStatement(self: *Self) void {
+        const loop_start = self.currentChunk().code.count;
+
+        self.consume(.leftbracket, "Expected a '(' to begin the condition.");
+        self.expression();
+        self.consume(.rightbracket, "Expected a ')' to begin the condition.");
+
+        const exit_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump_if_false));
+        self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+        self.statement();
+        self.emitLoop(loop_start);
+
+        self.patchJump(exit_jump);
+        self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+    }
+
+    fn forStatement(self: *Self) void {
+        beginScope();
+        self.consume(.leftbracket, "Expected a '(' to begin a 'for' loop expression.");
+        if (self.match(.semicolon)) {
+            // No initialier was added.
+        } else if (self.match(.keyword_let)) {
+            self.varDeclaration(true);
+        } else if (self.match(.keyword_letv)) {
+            self.varDeclaration(false);
+        } else {
+            self.exprStatement();
+        }
+
+        var loop_start = self.currentChunk().code.count;
+        var exit_jump: ?usize = null;
+        if (!self.match(.semicolon)) {
+            self.expression();
+            self.consume(.semicolon, "Expected a ';' to end the loop condition.");
+
+            // A jump out of the loop will occur if the condition is false.
+            exit_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump_if_false));
+            self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+        }
+
+        if (!self.match(.rightbracket)) {
+            const body_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump));
+            const inc_start = self.currentChunk().code.count;
+            self.expression();
+
+            self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+            self.consume(.rightbracket, "Expected a ')' to end the loop expression.");
+
+            self.emitLoop(loop_start);
+            loop_start = inc_start;
+            self.patchJump(body_jump);
+        }
+
+        self.statement();
+        self.emitLoop(loop_start);
+
+        if (exit_jump != null) {
+            self.patchJump(exit_jump.?);
+            self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+        }
+
+        self.endScope();
     }
 
     fn synchronise(self: *Self) void {
@@ -172,6 +333,7 @@ pub const Parser = struct {
                 .keyword_letv,
                 .keyword_if,
                 .keyword_while,
+                .keyword_for,
                 .keyword_print,
                 .keyword_return,
                 => return,
@@ -197,6 +359,16 @@ pub const Parser = struct {
     fn statement(self: *Self) void {
         if (self.match(sc.Tag.keyword_print)) {
             self.printStatement();
+        } else if (self.match(sc.Tag.keyword_if)) {
+            self.ifStatement();
+        } else if (self.match(sc.Tag.leftbrace)) {
+            beginScope();
+            self.block();
+            self.endScope();
+        } else if (self.match(sc.Tag.keyword_while)) {
+            self.whileStatement();
+        } else if (self.match(sc.Tag.keyword_for)) {
+            self.forStatement();
         } else {
             self.exprStatement();
         }
@@ -247,13 +419,24 @@ pub const Parser = struct {
     }
 
     fn namedVariable(self: *Self, name: *sc.Token, can_assign: bool) void {
-        const arg = self.constIdentifier(name);
+        var getOp: chk.OpCode = undefined;
+        var setOp: chk.OpCode = undefined;
+        var arg = compiler.resolveLocal(self, name);
+
+        if (arg != null) {
+            getOp = chk.OpCode.op_get_local;
+            setOp = chk.OpCode.op_set_local;
+        } else {
+            arg = self.constIdentifier(name);
+            getOp = chk.OpCode.op_get_global;
+            setOp = chk.OpCode.op_set_global;
+        }
 
         if (self.match(.equal) and can_assign) {
             self.expression();
-            self.emitBytes(@intFromEnum(chk.OpCode.op_set_global), arg);
+            self.emitBytes(@intFromEnum(setOp), @intCast(arg.?));
         } else {
-            self.emitBytes(@intFromEnum(chk.OpCode.op_get_global), arg);
+            self.emitBytes(@intFromEnum(getOp), @intCast(arg.?));
         }
     }
 
@@ -330,16 +513,74 @@ pub const Parser = struct {
         return self.makeConstant(Value.makeString(obj.String.copy(self.vm, name.lexeme)));
     }
 
-    fn parseIdenName(self: *Self, err_message: []const u8) u8 {
+    fn declareVariable(self: *Self) void {
+        if (compiler.scope_depth == 0) return;
+        var idx: usize = compiler.local_count;
+
+        const name = self.prev;
+        while (idx > 0) {
+            idx -= 1;
+
+            const local = compiler.locals[idx];
+            if (local.depth != -1 and local.depth < compiler.scope_depth) {
+                break;
+            }
+
+            if (std.mem.eql(u8, name.lexeme, local.name.lexeme)) {
+                self.err("Cannot redeclare a variable within the same scope.");
+            }
+        }
+
+        compiler.addLocal(self, name);
+    }
+
+    fn parseVariable(self: *Self, err_message: []const u8) u8 {
         self.consume(.identifier, err_message);
+
+        self.declareVariable();
+        if (compiler.scope_depth > 0) return 0;
+
         return self.constIdentifier(&self.prev);
     }
 
     fn defineVariable(self: *Self, global_idx: u8) void {
+        if (compiler.scope_depth > 0) {
+            compiler.markInitialised();
+            return;
+        }
+
         self.emitBytes(@intFromEnum(chk.OpCode.op_defvar_global), global_idx);
     }
 
+    fn _and(self: *Self, can_assign: bool) void {
+        _ = can_assign;
+
+        const end_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump_if_false));
+        self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+        self.parsePrecedence(.AND);
+
+        self.patchJump(end_jump);
+    }
+
+    fn _or(self: *Self, can_assign: bool) void {
+        _ = can_assign;
+
+        const else_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump_if_false));
+        const end_jump = self.emitJump(@intFromEnum(chk.OpCode.op_jump));
+
+        self.patchJump(else_jump);
+        self.emitByte(@intFromEnum(chk.OpCode.op_pop));
+
+        self.parsePrecedence(.OR);
+        self.patchJump(end_jump);
+    }
+
     fn defineConstant(self: *Self, global_idx: u8) void {
+        if (compiler.scope_depth > 0) {
+            compiler.markInitialised();
+            return;
+        }
+
         self.emitBytes(@intFromEnum(chk.OpCode.op_defconst_global), global_idx);
     }
 
@@ -352,12 +593,44 @@ pub const Parser = struct {
         self.emitByte(byte2);
     }
 
+    fn emitLoop(self: *Self, loop_start: usize) void {
+        self.emitByte(@intFromEnum(chk.OpCode.op_loop));
+        const offset = self.currentChunk().code.count - loop_start + 2;
+
+        if (offset > std.math.maxInt(u16)) self.err("The loop body is too large.");
+
+        const op1: u8 = @truncate(offset >> 8);
+        const op2: u8 = @truncate(offset);
+
+        self.emitBytes(op1 & 0xff, op2 & 0xff);
+    }
+
+    fn emitJump(self: *Self, instruction: u8) usize {
+        self.emitByte(instruction);
+        self.emitBytes(0xff, 0xff);
+
+        return self.currentChunk().code.count - 2;
+    }
+
     fn emitReturn(self: *Self) void {
         self.emitByte(@intFromEnum(chk.OpCode.op_return));
     }
 
     fn emitConstant(self: *Self, value: Value) void {
         self.emitBytes(@intFromEnum(chk.OpCode.op_const), self.makeConstant(value));
+    }
+
+    fn patchJump(self: *Self, offset: usize) void {
+        // -2 adjusts for the bytecode of the jump itself.
+        const jump = self.currentChunk().code.count - offset - 2;
+
+        if (jump > std.math.maxInt(u16)) self.err("Cannot jump over that much code.");
+
+        const op1: u8 = @truncate(jump >> 8);
+        const op2: u8 = @truncate(jump);
+
+        self.currentChunk().code.items[offset] = op1 & 0xff;
+        self.currentChunk().code.items[offset + 1] = op2 & 0xff;
     }
 
     fn makeConstant(self: *Self, constant: Value) u8 {
@@ -384,11 +657,11 @@ pub const Parser = struct {
         if (self.panic_mode) return;
 
         if (token.type == sc.Tag.EOF) {
-            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at EOF - {s}", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, @src(), "[line {any}] Error at EOF - {s}", .{ token.line, message });
         } else if (token.type == sc.Tag.error_token) {
-            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error - {s}", .{ token.line, message });
+            Logger.log(std.log.Level.err, .Compiler, @src(), "[line {any}] Error - {s}", .{ token.line, message });
         } else {
-            Logger.log(std.log.Level.err, .Compiler, "[line {any}] Error at '{s}' - {s}", .{ token.line, token.lexeme, message });
+            Logger.log(std.log.Level.err, .Compiler, @src(), "[line {any}] Error at '{s}' - {s}", .{ token.line, token.lexeme, message });
         }
 
         self.panic_mode = true;

@@ -74,8 +74,8 @@ pub const VirtualMachine = struct {
     }
 
     fn runtimeError(self: *Self, comptime text: []const u8, args: anytype) void {
-        Logger.log(std.log.Level.err, .VM, text, args);
-        Logger.log(std.log.Level.err, .VM, "[line {d}] in script.", .{self.chunk.lines.items[self.ip]});
+        Logger.log(std.log.Level.err, .VM, @src(), text, args);
+        Logger.log(std.log.Level.err, .VM, @src(), "[line {d}] in script.", .{self.chunk.lines.items[self.ip]});
 
         self.resetStack();
     }
@@ -99,8 +99,9 @@ pub const VirtualMachine = struct {
     fn run(self: *Self) InterpretResult {
         while (true) {
             if (comptime debug_trace_execution) {
-                for (self.stack) |*stack_value| {
-                    std.debug.print("[  {d:.3}  ]", .{stack_value.asNumber()});
+                for (self.stack, 0..) |stack_value, i| {
+                    if (i > 5) break;
+                    std.debug.print("[  {any}  ]", .{stack_value});
                 }
                 std.debug.print("\n", .{});
 
@@ -123,6 +124,7 @@ pub const VirtualMachine = struct {
                     const negated_value = self.pop().asNumber() * -1;
                     self.push(Value.makeNumber(negated_value));
                 },
+                //TODO: Get this actually useable again (maybe a |value| syntax?).
                 .op_abs => self.push(Value.makeNumber(if (self.pop().asNumber() > 0) self.pop().asNumber() else self.pop().asNumber() * -1)),
                 .op_subtract, .op_multiply, .op_divide, .op_greater, .op_less, .op_mod => |op| {
                     const res = self.binaryOperator(op);
@@ -154,10 +156,7 @@ pub const VirtualMachine = struct {
 
                     self.push(Value.makeBool(Value.checkEquality(&value1, &value2)));
                 },
-                .op_print => {
-                    Value.printValue(self.pop());
-                    return .OK;
-                },
+                .op_print => Value.printValue(self.pop()),
                 .op_pop => _ = self.pop(),
                 .op_defvar_global, .op_defconst_global => |declaration_op| {
                     const global = self.chunk.constants.items[self.getNextByte()];
@@ -197,6 +196,26 @@ pub const VirtualMachine = struct {
                         return InterpretResult.RUNTIME_ERROR;
                     }
                 },
+                .op_get_local => {
+                    const slot = self.getNextByte();
+                    self.push(self.stack[slot]);
+                },
+                .op_set_local => {
+                    const slot = self.getNextByte();
+                    self.stack[slot] = self.peek(0);
+                },
+                .op_jump_if_false => {
+                    const offset = self.readShort();
+                    if (self.peek(0).isFalsey()) self.ip += offset;
+                },
+                .op_jump => {
+                    const offset = self.readShort();
+                    self.ip += offset;
+                },
+                .op_loop => {
+                    const offset = self.readShort();
+                    self.ip -= offset;
+                },
                 else => {},
             }
         }
@@ -207,6 +226,14 @@ pub const VirtualMachine = struct {
         self.ip += 1;
 
         return byte;
+    }
+
+    inline fn readShort(self: *Self) u16 {
+        const byte1 = @as(u16, self.chunk.code.items[self.ip]);
+        const byte2 = self.chunk.code.items[self.ip + 1];
+        self.ip += 2;
+
+        return (byte1 << 8) | byte2;
     }
 
     fn push(self: *Self, value: Value) void {
@@ -244,7 +271,7 @@ pub const VirtualMachine = struct {
         const a = self.pop().asString();
 
         const result = std.mem.concat(self.allocator, u8, &[_][]const u8{ a.characters, b.characters }) catch {
-            Logger.log(std.log.Level.err, .Compiler, "Not enough memory to concatenate strings.", .{});
+            Logger.log(std.log.Level.err, .Compiler, @src(), "Not enough memory to concatenate strings.", .{});
             std.process.exit(1);
         };
 

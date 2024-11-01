@@ -2,7 +2,6 @@ const std = @import("std");
 const log = @import("../logger.zig");
 
 const Logger = log.Logger;
-const LogLevel = log.LogLevel;
 
 pub fn DynArray(comptime T: type) type {
     return struct {
@@ -45,7 +44,7 @@ pub fn DynArray(comptime T: type) type {
             }
 
             const result = self.allocator.realloc(self.items, new_size) catch {
-                Logger.log(std.log.Level.err, .Memory, "Ran out of memory to increase the size of the DynArray.", .{});
+                Logger.log(std.log.Level.err, .Memory, @src(), "Ran out of memory to increase the size of the DynArray.", .{});
                 std.process.exit(1);
             };
 

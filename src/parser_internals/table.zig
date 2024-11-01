@@ -131,7 +131,7 @@ pub const Table = struct {
 
     fn adjustCapacity(self: *Self) void {
         const entries = self.allocator.alloc(Entry, self.capacity) catch {
-            Logger.log(std.log.Level.err, .HashTbl, "Ran out of memory to increase the size of the hash table.", .{});
+            Logger.log(std.log.Level.err, .HashTbl, @src(), "Ran out of memory to increase the size of the hash table.", .{});
             std.process.exit(1);
         };
 

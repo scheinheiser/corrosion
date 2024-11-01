@@ -4,11 +4,13 @@ pub const Logger = struct {
     pub fn log(
         comptime level: std.log.Level,
         comptime scope: anytype,
+        comptime src: std.builtin.SourceLocation,
         comptime text: []const u8,
         args: anytype,
     ) void {
-        const scope_prefix = "(" ++ comptime @tagName(scope) ++ "): ";
-        const prefix = "[" ++ comptime level.asText() ++ "] ~ " ++ scope_prefix;
+        const src_prefix = " ~ @" ++ src.file ++ "; " ++ src.fn_name ++ "(): ";
+        const scope_prefix = "(" ++ comptime @tagName(scope) ++ ")";
+        const prefix = "[" ++ comptime level.asText() ++ "] ~ " ++ scope_prefix ++ src_prefix;
 
         std.debug.lockStdErr();
         defer std.debug.unlockStdErr();

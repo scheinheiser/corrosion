@@ -101,10 +101,10 @@ pub const Value = union(enum) {
 
     pub fn logValue(self: Self) void {
         switch (self) {
-            .number => Logger.log(std.log.Level.debug, .Result, "'{d:.3}'", .{self.number}),
-            .boolean => Logger.log(std.log.Level.debug, .Result, "'{any}'", .{self.boolean}),
-            .nil => Logger.log(std.log.Level.debug, .Result, "'nil'", .{}),
-            .string => Logger.log(std.log.Level.debug, .Result, "'{s}'", .{self.asString().characters}),
+            .number => Logger.log(std.log.Level.debug, .Result, @src(), "'{d:.3}'", .{self.number}),
+            .boolean => Logger.log(std.log.Level.debug, .Result, @src(), "'{any}'", .{self.boolean}),
+            .nil => Logger.log(std.log.Level.debug, .Result, @src(), "'nil'", .{}),
+            .string => Logger.log(std.log.Level.debug, .Result, @src(), "'{s}'", .{self.asString().characters}),
         }
     }
 };

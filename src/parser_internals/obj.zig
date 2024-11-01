@@ -20,7 +20,7 @@ pub const Obj = struct {
 
     pub fn make(vm: *VM, comptime T: type, obj_type: ObjType) *T {
         var obj_pointer = vm.allocator.create(T) catch {
-            Logger.log(std.log.Level.err, .Obj, "Failed to create object.", .{});
+            Logger.log(std.log.Level.err, .Obj, @src(), "Failed to create object.", .{});
             std.process.exit(1);
         };
 
@@ -61,7 +61,7 @@ pub const String = struct {
         if (interned_string != null) return interned_string.?;
 
         const heap_bytes = vm.allocator.alloc(u8, characters.len) catch {
-            Logger.log(std.log.Level.err, .Obj, "Failed to copy string.", .{});
+            Logger.log(std.log.Level.err, .Obj, @src(), "Failed to copy string.", .{});
             std.process.exit(1);
         };
 

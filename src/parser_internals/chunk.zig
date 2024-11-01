@@ -16,11 +16,15 @@ pub const OpCode = enum {
     op_mod,
 
     op_print,
+    op_pop,
+
     op_defconst_global,
     op_defvar_global,
+
     op_get_global,
     op_set_global,
-    op_pop,
+    op_get_local,
+    op_set_local,
 
     op_not,
     op_greater,
@@ -30,6 +34,10 @@ pub const OpCode = enum {
     op_nil,
     op_true,
     op_false,
+
+    op_jump_if_false,
+    op_jump,
+    op_loop,
 
     op_return,
     blank,

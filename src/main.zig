@@ -24,6 +24,7 @@ pub const std_options: std.Options = std.Options{
 };
 
 pub fn main() !void {
+    //TODO: Change to a gpa.
     const allocator = std.heap.page_allocator;
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -34,7 +35,7 @@ pub fn main() !void {
         1 => repl(&virtual),
         2 => try runFile(args[1], &virtual, allocator),
         else => {
-            Logger.log(std.log.Level.err, .REPL, "Usage: buzz [path]\n", .{});
+            Logger.log(std.log.Level.err, .REPL, @src(), "Usage: buzz [path]\n", .{});
             std.process.exit(64);
         },
     };

@@ -1,14 +1,14 @@
 const std = @import("std");
 const val = @import("value.zig");
-const Log = @import("../logger.zig");
 
-const Logger = Log.Logger;
 const Value = val.Value;
 
 pub const Tag = enum {
     // Single character tokens
     leftbracket, // (
     rightbracket, // )
+    leftbrace, // {
+    rightbrace, // }
     double_quote, // " .. "
     single_quote, // ' .. '
     plus, // +
@@ -38,6 +38,7 @@ pub const Tag = enum {
     keyword_or,
     keyword_nil,
     keyword_if,
+    keyword_else,
     keyword_for,
     keyword_while,
     keyword_false,
@@ -108,6 +109,8 @@ pub const Scanner = struct {
         switch (character) {
             '(' => return self.makeToken(Tag.leftbracket),
             ')' => return self.makeToken(Tag.rightbracket),
+            '{' => return self.makeToken(Tag.leftbrace),
+            '}' => return self.makeToken(Tag.rightbrace),
             ',' => return self.makeToken(Tag.comma),
             '.' => return self.makeToken(Tag.dot),
             '+' => return self.makeToken(Tag.plus),
@@ -180,6 +183,7 @@ pub const Scanner = struct {
             } else {
                 return self.checkKeyword("let", Tag.keyword_let);
             },
+            'e' => return self.checkKeyword("else", Tag.keyword_else),
             else => return Tag.identifier,
         }
     }
